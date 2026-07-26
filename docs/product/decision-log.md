@@ -28,3 +28,6 @@
 | 2026-07-25 | Model done/not-done as a space capability. | Completion is useful in some spaces, such as Shopping, but should not force every item to behave like a task. |
 | 2026-07-25 | Exclude structured quantities and prices from the initial Shopping template. | Plain text covers the need without turning a simple list into an inventory or budgeting feature. |
 | 2026-07-25 | Add one optional location field to a Shopping space. | The space name identifies the shopping context; location adds useful detail without a complex store model. |
+| 2026-07-26 | Make space icons and colours optional after-creation customisation. | Space creation should require only the minimum context; appearance can be refined later. |
+| 2026-07-26 | Let users add space capabilities during creation or later. | Users can start quickly while retaining the ability to shape a space as its needs become clear. |
+| 2026-07-26 | Delete associated data when a capability is removed, with confirmation. | The product will not retain historical capability data in its first version; irreversible deletion must be clear and deliberate. |

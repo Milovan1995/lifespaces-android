@@ -11,7 +11,16 @@ not restrict later changes.
 Capabilities define what items in a space can do. They are not separate item
 types. For example, a **completion** capability gives items a done/not-done
 state. A template enables useful capabilities by default, while a space may be
-customised later.
+customised later. Users may select capabilities while creating a custom space
+or add them afterwards.
+
+Each capability provides its own visible controls and behaviour. For example,
+the **calendar** capability provides date-related controls and calendar
+visibility, while **completion** provides a done/not-done checkbox.
+
+Capabilities can be removed. Removing one permanently deletes its associated
+data after explicit user confirmation. The initial product keeps no change
+history or restoration log.
 
 Calendar visibility is global: any item with a date appears in the calendar,
 whether or not its space has other capabilities.
@@ -27,6 +36,9 @@ whether or not its space has other capabilities.
 
 Users can create a custom space and choose the information it needs, such as
 notes, dates, prices, or email addresses.
+
+An icon and colour are optional visual details and can be added or changed
+after a space is created.
 
 ## Scope guard
 

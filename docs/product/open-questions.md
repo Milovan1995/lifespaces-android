@@ -6,7 +6,7 @@
   calendar item, reminder?
 - Which fields are essential for a custom space in the first usable version?
 
-## Space creation
+## Data lifecycle
 
-- Must users choose an icon or colour while creating a space, or can these be
-  added later?
+- When a user deletes a whole space, should its items be deleted, moved to
+  Nesortirano, or require the user to choose?
