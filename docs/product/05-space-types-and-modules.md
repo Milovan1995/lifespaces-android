@@ -55,3 +55,9 @@ write quantities and prices in the item text when needed.
 
 A Shopping space may have one optional location field. Its name remains the
 primary context, for example a space named “Voli”.
+
+Purchased items remain visible as crossed out until the user deletes them.
+
+Items inside a space can be manually reordered with drag and drop.
+
+Items can also be sorted by their available characteristics, such as date.

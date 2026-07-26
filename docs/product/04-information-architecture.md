@@ -12,6 +12,9 @@
 A dated item appears in the global calendar whether it belongs to a space or
 remains in Nesortirano. Items without a space have no space label or colour.
 
+Items retain their own characteristics, such as a date. Users can sort items
+by available characteristics, including date, when that is useful.
+
 An item with a date but no time is an all-day calendar item. Any dated item
 may have optional reminders. When reminders are enabled, the user configures
 at least one reminder date and time and may add an unlimited number of

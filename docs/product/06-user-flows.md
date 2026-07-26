@@ -27,6 +27,11 @@ An item leaves Nesortirano automatically when it is assigned to a space. A
 date alone does not remove it from Nesortirano, but makes it visible in the
 global calendar.
 
+When a space is deleted, its items move to Nesortirano rather than being
+deleted. The user must explicitly confirm this action.
+
+Deleting an individual item is permanent and requires explicit confirmation.
+
 A date without time creates an all-day calendar item. If the user chooses a
 time, it ranges from `00:00:00` (midnight) through `23:59:59`. The user can
 optionally set reminders for any dated item. A reminder configuration contains

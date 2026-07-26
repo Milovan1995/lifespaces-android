@@ -31,3 +31,9 @@
 | 2026-07-26 | Make space icons and colours optional after-creation customisation. | Space creation should require only the minimum context; appearance can be refined later. |
 | 2026-07-26 | Let users add space capabilities during creation or later. | Users can start quickly while retaining the ability to shape a space as its needs become clear. |
 | 2026-07-26 | Delete associated data when a capability is removed, with confirmation. | The product will not retain historical capability data in its first version; irreversible deletion must be clear and deliberate. |
+| 2026-07-26 | Move items to Nesortirano when their space is deleted. | Deleting a container must not discard its items; users can reassign or edit them afterwards. |
+| 2026-07-26 | Require confirmation before deleting a space. | The action changes the user's organisation even though items are preserved. |
+| 2026-07-26 | Permanently delete an individual item after confirmation. | An archive or trash stage is not needed in the initial product; deletion must be explicit. |
+| 2026-07-26 | Keep completed Shopping items visible and crossed out. | Completion communicates status without hiding information; the user deletes an item when it is no longer useful. |
+| 2026-07-26 | Allow manual drag-and-drop order within a space. | Users need a simple way to arrange active items without adding sorting rules or priorities. |
+| 2026-07-26 | Let users sort items by their characteristics. | Item-level data such as date should support useful ordering in addition to manual ordering. |

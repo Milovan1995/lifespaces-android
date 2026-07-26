@@ -6,7 +6,6 @@
   calendar item, reminder?
 - Which fields are essential for a custom space in the first usable version?
 
-## Data lifecycle
+## Nesortirano
 
-- When a user deletes a whole space, should its items be deleted, moved to
-  Nesortirano, or require the user to choose?
+- Should new items appear at the top or bottom of Nesortirano?
