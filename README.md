@@ -74,21 +74,15 @@ docs/architecture/
 
 ## Technology
 
-The final technology choices have not been made yet.
+The first version will be a native Android application built with Kotlin,
+Jetpack Compose, Material 3, Room, Coroutines and Flow. It is offline-first;
+cloud synchronisation, voice input, and AI classification are later decisions.
 
-The application is expected to evaluate:
+Architecture decisions are documented in:
 
-- Kotlin
-- Jetpack Compose
-- Material 3
-- Room
-- Coroutines and Flow
-- WorkManager
-- AlarmManager
-- Android speech recognition
-
-Technology decisions will be documented after the MVP and product requirements
-are defined.
+```text
+docs/architecture/
+```
 
 ## Author
 
