@@ -22,6 +22,27 @@ class LifeSpacesRepository(
 
     suspend fun createItem(text: String, spaceId: Long? = null): Long =
         itemDao.insert(Item(text = text, spaceId = spaceId))
+
+    suspend fun updateItemText(itemId: Long, text: String) {
+        itemDao.updateText(itemId, text.trim(), System.currentTimeMillis())
+    }
+
+    suspend fun moveItem(itemId: Long, spaceId: Long?) {
+        itemDao.updateSpace(itemId, spaceId, System.currentTimeMillis())
+    }
+
+    suspend fun setItemCompleted(itemId: Long, completed: Boolean) {
+        itemDao.updateCompleted(itemId, completed, System.currentTimeMillis())
+    }
+
+    suspend fun deleteItem(itemId: Long) {
+        itemDao.getById(itemId)?.let(itemDao::delete)
+    }
+
+    suspend fun deleteSpace(spaceId: Long) {
+        itemDao.clearSpace(spaceId, System.currentTimeMillis())
+        spaceDao.deleteById(spaceId)
+    }
 }
 
 data class HomeFeed(

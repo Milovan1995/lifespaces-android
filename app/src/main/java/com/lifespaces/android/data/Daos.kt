@@ -21,6 +21,9 @@ interface SpaceDao {
     @Delete
     suspend fun delete(space: Space)
 
+    @Query("DELETE FROM spaces WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("SELECT * FROM spaces WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): Space?
 }
@@ -38,6 +41,18 @@ interface ItemDao {
 
     @Delete
     suspend fun delete(item: Item)
+
+    @Query("UPDATE items SET spaceId = :spaceId, updatedAt = :updatedAt WHERE id = :itemId")
+    suspend fun updateSpace(itemId: Long, spaceId: Long?, updatedAt: Long)
+
+    @Query("UPDATE items SET spaceId = NULL, updatedAt = :updatedAt WHERE spaceId = :spaceId")
+    suspend fun clearSpace(spaceId: Long, updatedAt: Long)
+
+    @Query("UPDATE items SET text = :text, updatedAt = :updatedAt WHERE id = :itemId")
+    suspend fun updateText(itemId: Long, text: String, updatedAt: Long)
+
+    @Query("UPDATE items SET completed = :completed, updatedAt = :updatedAt WHERE id = :itemId")
+    suspend fun updateCompleted(itemId: Long, completed: Boolean, updatedAt: Long)
 
     @Query("SELECT * FROM items WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): Item?

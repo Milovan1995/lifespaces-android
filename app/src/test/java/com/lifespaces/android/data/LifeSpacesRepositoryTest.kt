@@ -34,10 +34,36 @@ class LifeSpacesRepositoryTest {
 
     @Test
     fun createSpaceAndItem_updatesFlows() = runTest {
-        repository.createSpace("Home")
-        repository.createItem("Milk")
+        val spaceId = repository.createSpace("Home")
+        val itemId = repository.createItem("Milk")
+        val secondItemId = repository.createItem("Bread")
 
         assertEquals(1, repository.spaces.first().size)
         assertEquals(1, repository.items.first().size)
+
+        repository.moveItem(itemId, spaceId)
+        repository.moveItem(secondItemId, spaceId)
+        assertEquals(setOf(spaceId, spaceId), repository.items.first().map { it.spaceId }.toSet())
+
+        repository.deleteSpace(spaceId)
+        assertEquals(setOf(null), repository.items.first().map { it.spaceId }.toSet())
+    }
+
+    @Test
+    fun deleteItem_removesIt() = runTest {
+        val itemId = repository.createItem("Temporary")
+
+        repository.deleteItem(itemId)
+
+        assertEquals(0, repository.items.first().size)
+    }
+
+    @Test
+    fun completion_isStoredForAnItem() = runTest {
+        val itemId = repository.createItem("Milk")
+
+        repository.setItemCompleted(itemId, true)
+
+        assertEquals(true, repository.items.first().single().completed)
     }
 }
