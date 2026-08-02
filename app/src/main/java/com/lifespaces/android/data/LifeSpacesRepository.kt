@@ -36,7 +36,8 @@ class LifeSpacesRepository(
     }
 
     suspend fun deleteItem(itemId: Long) {
-        itemDao.getById(itemId)?.let(itemDao::delete)
+        val item = itemDao.getById(itemId) ?: return
+        itemDao.delete(item)
     }
 
     suspend fun deleteSpace(spaceId: Long) {

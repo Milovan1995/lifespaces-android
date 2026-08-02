@@ -39,7 +39,7 @@ class LifeSpacesRepositoryTest {
         val secondItemId = repository.createItem("Bread")
 
         assertEquals(1, repository.spaces.first().size)
-        assertEquals(1, repository.items.first().size)
+        assertEquals(2, repository.items.first().size)
 
         repository.moveItem(itemId, spaceId)
         repository.moveItem(secondItemId, spaceId)

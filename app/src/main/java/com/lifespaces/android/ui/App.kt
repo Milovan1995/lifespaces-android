@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -286,5 +287,25 @@ private fun ItemCard(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ItemCardPreview() {
+    MaterialTheme {
+        ItemCard(
+            item = Item(id = 1, text = "Mlijeko"),
+            spaces = listOf(Space(id = 2, name = "Voli", template = "Shopping")),
+            showCompletion = true,
+            isEditing = false,
+            editingText = "Mlijeko",
+            onEdit = {},
+            onTextChange = {},
+            onSave = {},
+            onMove = {},
+            onCompletedChange = {},
+            onDelete = {},
+        )
     }
 }
