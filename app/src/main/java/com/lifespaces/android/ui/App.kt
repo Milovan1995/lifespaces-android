@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -27,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +48,7 @@ fun App(viewModel: AppViewModel) {
     var editingText by rememberSaveable { mutableStateOf("") }
     var deletingItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val inboxItems = state.items.filter { it.spaceId == null }
 
     MaterialTheme {
         Scaffold { innerPadding ->
@@ -57,7 +61,11 @@ fun App(viewModel: AppViewModel) {
             ) {
                 item {
                     Text("LifeSpaces", style = MaterialTheme.typography.headlineMedium)
-                    Text("Brzi unos")
+                    Text("Brzi unos", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Zapiši ideju, zadatak ili podsjetnik. Kasnije ga možeš premjestiti u prostor.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
                 item {
                     Card {
@@ -71,8 +79,13 @@ fun App(viewModel: AppViewModel) {
                                 modifier = Modifier.fillMaxWidth(),
                                 label = { Text("Nova stavka") },
                                 singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                keyboardActions = KeyboardActions(onDone = { viewModel.saveCapture() }),
                             )
-                            Button(onClick = viewModel::saveCapture) { Text("Sačuvaj") }
+                            Button(
+                                onClick = viewModel::saveCapture,
+                                enabled = captureText.isNotBlank(),
+                            ) { Text("Sačuvaj") }
                         }
                     }
                 }
@@ -108,10 +121,21 @@ fun App(viewModel: AppViewModel) {
                                 }
                             }
                         }
-                        Button(onClick = {
-                            viewModel.createSpace(spaceName, spaceTemplate)
-                            spaceName = ""
-                        }) { Text("Kreiraj prostor") }
+                        Button(
+                            onClick = {
+                                viewModel.createSpace(spaceName, spaceTemplate)
+                                spaceName = ""
+                            },
+                            enabled = spaceName.isNotBlank(),
+                        ) { Text("Kreiraj prostor") }
+                    }
+                }
+                if (state.spaces.isEmpty()) {
+                    item {
+                        Text(
+                            "Još nema prostora. Kreiraj prvi iznad da organizuješ stavke.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
                 }
                 state.spaces.forEach { space ->
@@ -151,9 +175,15 @@ fun App(viewModel: AppViewModel) {
                     }
                 }
                 item {
-                    Text("Nesortirano (${state.items.count { it.spaceId == null }})")
+                    Text("Nesortirano (${inboxItems.size})", style = MaterialTheme.typography.titleMedium)
+                    if (inboxItems.isEmpty()) {
+                        Text(
+                            "Nesortirano je prazno. Sačuvane stavke će se pojaviti ovdje.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
-                items(state.items.filter { it.spaceId == null }, key = { it.id }) { item ->
+                items(inboxItems, key = { it.id }) { item ->
                     ItemCard(
                         item = item,
                         spaces = state.spaces,
