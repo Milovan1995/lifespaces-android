@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lifespaces.android.data.Item
@@ -88,6 +89,36 @@ fun App(viewModel: AppViewModel) {
                             ) { Text("Sačuvaj") }
                         }
                     }
+                }
+                item {
+                    Text("Nesortirano (${inboxItems.size})", style = MaterialTheme.typography.titleMedium)
+                    if (inboxItems.isEmpty()) {
+                        Text(
+                            "Nesortirano je prazno. Sačuvane stavke će se pojaviti ovdje.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+                items(inboxItems, key = { it.id }) { item ->
+                    ItemCard(
+                        item = item,
+                        spaces = state.spaces,
+                        showCompletion = false,
+                        isEditing = editingItemId == item.id,
+                        editingText = if (editingItemId == item.id) editingText else item.text,
+                        onEdit = {
+                            editingItemId = item.id
+                            editingText = item.text
+                        },
+                        onTextChange = { editingText = it },
+                        onSave = {
+                            viewModel.updateItemText(item.id, editingText)
+                            editingItemId = null
+                        },
+                        onMove = { spaceId -> viewModel.moveItem(item.id, spaceId) },
+                        onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
+                        onDelete = { deletingItemId = item.id },
+                    )
                 }
                 item { HorizontalDivider() }
                 item { Text("Prostori (${state.spaces.size})") }
@@ -152,6 +183,14 @@ fun App(viewModel: AppViewModel) {
                             }
                         }
                     }
+                    if (spaceItems.isEmpty()) {
+                        item {
+                            Text(
+                                "Ovaj prostor još nema stavki.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
                     items(spaceItems, key = { it.id }) { item ->
                         ItemCard(
                             item = item,
@@ -173,36 +212,6 @@ fun App(viewModel: AppViewModel) {
                             onDelete = { deletingItemId = item.id },
                         )
                     }
-                }
-                item {
-                    Text("Nesortirano (${inboxItems.size})", style = MaterialTheme.typography.titleMedium)
-                    if (inboxItems.isEmpty()) {
-                        Text(
-                            "Nesortirano je prazno. Sačuvane stavke će se pojaviti ovdje.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
-                items(inboxItems, key = { it.id }) { item ->
-                    ItemCard(
-                        item = item,
-                        spaces = state.spaces,
-                        showCompletion = false,
-                        isEditing = editingItemId == item.id,
-                        editingText = if (editingItemId == item.id) editingText else item.text,
-                        onEdit = {
-                            editingItemId = item.id
-                            editingText = item.text
-                        },
-                        onTextChange = { editingText = it },
-                        onSave = {
-                            viewModel.updateItemText(item.id, editingText)
-                            editingItemId = null
-                        },
-                        onMove = { spaceId -> viewModel.moveItem(item.id, spaceId) },
-                        onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
-                        onDelete = { deletingItemId = item.id },
-                    )
                 }
             }
         }
@@ -272,8 +281,13 @@ private fun ItemCard(
                     onValueChange = onTextChange,
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onSave() }),
                 )
-                Button(onClick = onSave) { Text("Sačuvaj izmjenu") }
+                Button(
+                    onClick = onSave,
+                    enabled = editingText.isNotBlank(),
+                ) { Text("Sačuvaj izmjenu") }
             } else {
                 Row {
                     if (showCompletion) {
@@ -287,6 +301,11 @@ private fun ItemCard(
                         modifier = Modifier.weight(1f).padding(top = 12.dp),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                        textDecoration = if (item.completed == true) {
+                            TextDecoration.LineThrough
+                        } else {
+                            TextDecoration.None
+                        },
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
