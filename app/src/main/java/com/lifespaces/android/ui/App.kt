@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -52,17 +53,18 @@ fun App(viewModel: AppViewModel) {
     val inboxItems = state.items.filter { it.spaceId == null }
 
     MaterialTheme {
-        Scaffold { innerPadding ->
+        Scaffold(
+            topBar = { TopAppBar(title = { Text("LifeSpaces") }) },
+        ) { innerPadding ->
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(24.dp),
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 item {
-                    Text("LifeSpaces", style = MaterialTheme.typography.headlineMedium)
-                    Text("Brzi unos", style = MaterialTheme.typography.titleMedium)
+                    Text("Brzi unos", style = MaterialTheme.typography.headlineSmall)
                     Text(
                         "Zapiši ideju, zadatak ili podsjetnik. Kasnije ga možeš premjestiti u prostor.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -85,6 +87,7 @@ fun App(viewModel: AppViewModel) {
                             )
                             Button(
                                 onClick = viewModel::saveCapture,
+                                modifier = Modifier.fillMaxWidth(),
                                 enabled = captureText.isNotBlank(),
                             ) { Text("Sačuvaj") }
                         }
@@ -157,6 +160,7 @@ fun App(viewModel: AppViewModel) {
                                 viewModel.createSpace(spaceName, spaceTemplate)
                                 spaceName = ""
                             },
+                            modifier = Modifier.fillMaxWidth(),
                             enabled = spaceName.isNotBlank(),
                         ) { Text("Kreiraj prostor") }
                     }
