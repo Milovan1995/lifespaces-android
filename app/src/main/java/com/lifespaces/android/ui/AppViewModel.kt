@@ -36,10 +36,10 @@ class AppViewModel(private val repository: LifeSpacesRepository) : ViewModel() {
         }
     }
 
-    fun createSpace(name: String, template: String) {
+    fun createSpace(name: String, template: String, location: String = "") {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
-        viewModelScope.launch { repository.createSpace(trimmed, template) }
+        viewModelScope.launch { repository.createSpace(trimmed, template, location) }
     }
 
     fun updateItemText(itemId: Long, text: String) {

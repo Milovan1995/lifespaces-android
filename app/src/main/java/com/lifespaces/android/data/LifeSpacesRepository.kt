@@ -17,8 +17,8 @@ class LifeSpacesRepository(
         HomeFeed(spaces = spaces, items = items)
     }
 
-    suspend fun createSpace(name: String, template: String = "General"): Long =
-        spaceDao.insert(Space(name = name, template = template))
+    suspend fun createSpace(name: String, template: String = "General", location: String? = null): Long =
+        spaceDao.insert(Space(name = name, template = template, location = location?.trim()?.takeIf { it.isNotEmpty() }))
 
     suspend fun createItem(text: String, spaceId: Long? = null): Long =
         itemDao.insert(Item(text = text, spaceId = spaceId))

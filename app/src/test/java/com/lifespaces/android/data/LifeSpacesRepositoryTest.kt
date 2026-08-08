@@ -34,11 +34,12 @@ class LifeSpacesRepositoryTest {
 
     @Test
     fun createSpaceAndItem_updatesFlows() = runTest {
-        val spaceId = repository.createSpace("Home")
+        val spaceId = repository.createSpace("Home", location = "Kitchen")
         val itemId = repository.createItem("Milk")
         val secondItemId = repository.createItem("Bread")
 
         assertEquals(1, repository.spaces.first().size)
+        assertEquals("Kitchen", repository.spaces.first().single().location)
         assertEquals(2, repository.items.first().size)
 
         repository.moveItem(itemId, spaceId)

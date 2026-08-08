@@ -44,6 +44,7 @@ fun App(viewModel: AppViewModel) {
     val state by viewModel.state.collectAsState()
     val captureText by viewModel.captureText.collectAsState()
     var spaceName by rememberSaveable { mutableStateOf("") }
+    var spaceLocation by rememberSaveable { mutableStateOf("") }
     var spaceTemplate by rememberSaveable { mutableStateOf("Shopping") }
     var templateMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var editingItemId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -157,12 +158,20 @@ fun App(viewModel: AppViewModel) {
                         }
                         Button(
                             onClick = {
-                                viewModel.createSpace(spaceName, spaceTemplate)
+                                viewModel.createSpace(spaceName, spaceTemplate, spaceLocation)
                                 spaceName = ""
+                                spaceLocation = ""
                             },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = spaceName.isNotBlank(),
                         ) { Text("Kreiraj prostor") }
+                        OutlinedTextField(
+                            value = spaceLocation,
+                            onValueChange = { spaceLocation = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Lokacija (opciono)") },
+                            singleLine = true,
+                        )
                     }
                 }
                 if (state.spaces.isEmpty()) {
@@ -177,11 +186,13 @@ fun App(viewModel: AppViewModel) {
                     val spaceItems = state.items.filter { it.spaceId == space.id }
                     item(key = "space-${space.id}") {
                         Row {
-                            Text(
-                                "${space.name} (${spaceItems.size})",
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "${space.name} (${spaceItems.size})",
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                space.location?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                            }
                             TextButton(onClick = { deletingSpaceId = space.id }) {
                                 Text("Obriši prostor")
                             }
