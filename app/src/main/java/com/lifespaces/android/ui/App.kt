@@ -156,10 +156,11 @@ fun App(viewModel: AppViewModel) {
                                 modifier = Modifier.weight(1f),
                                 label = { Text("Novi prostor") },
                                 singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             )
                             Box {
                                 Button(onClick = { templateMenuExpanded = true }) {
-                                    Text(spaceTemplate)
+                                    Text("Šablon: $spaceTemplate")
                                 }
                                 DropdownMenu(
                                     expanded = templateMenuExpanded,
@@ -177,6 +178,14 @@ fun App(viewModel: AppViewModel) {
                                 }
                             }
                         }
+                        OutlinedTextField(
+                            value = spaceLocation,
+                            onValueChange = { spaceLocation = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Lokacija (opciono)") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        )
                         Button(
                             onClick = {
                                 viewModel.createSpace(spaceName, spaceTemplate, spaceLocation)
@@ -186,13 +195,6 @@ fun App(viewModel: AppViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                             enabled = spaceName.isNotBlank(),
                         ) { Text("Kreiraj prostor") }
-                        OutlinedTextField(
-                            value = spaceLocation,
-                            onValueChange = { spaceLocation = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Lokacija (opciono)") },
-                            singleLine = true,
-                        )
                     }
                 }
                 if (state.spaces.isEmpty()) {
