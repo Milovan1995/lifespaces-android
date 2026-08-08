@@ -24,7 +24,9 @@ class LifeSpacesRepository(
         itemDao.insert(Item(text = text, spaceId = spaceId))
 
     suspend fun updateItemText(itemId: Long, text: String) {
-        itemDao.updateText(itemId, text.trim(), System.currentTimeMillis())
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        itemDao.updateText(itemId, trimmed, System.currentTimeMillis())
     }
 
     suspend fun moveItem(itemId: Long, spaceId: Long?) {

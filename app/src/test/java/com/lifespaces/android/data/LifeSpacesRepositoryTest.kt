@@ -66,4 +66,15 @@ class LifeSpacesRepositoryTest {
 
         assertEquals(true, repository.items.first().single().completed)
     }
+
+    @Test
+    fun updateText_trimsWhitespaceAndKeepsExistingTextForBlankInput() = runTest {
+        val itemId = repository.createItem("Original")
+
+        repository.updateItemText(itemId, "  Updated  ")
+        assertEquals("Updated", repository.items.first().single().text)
+
+        repository.updateItemText(itemId, "   ")
+        assertEquals("Updated", repository.items.first().single().text)
+    }
 }

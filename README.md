@@ -24,10 +24,10 @@ time-based items can also be displayed in a unified calendar.
 
 ## Project status
 
-LifeSpaces is currently in the product discovery and architecture planning
-phase.
-
-Implementation has not started yet.
+The Android MVP is under active development. The current build supports text
+capture into Nesortirano, custom spaces, moving and editing items, Shopping
+completion, and destructive-action confirmations. Calendar, reminders,
+advanced sorting, and additional templates are still in progress.
 
 ## Main product goals
 
