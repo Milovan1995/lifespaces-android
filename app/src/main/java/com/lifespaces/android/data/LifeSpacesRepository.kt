@@ -57,8 +57,9 @@ class LifeSpacesRepository(
         template: String,
         location: String?,
         capabilities: Set<String>,
+        color: Long? = null,
     ): Long = spaceDao.create(
-        Space(name = name, template = template, location = cleanLocation(location, capabilities)),
+        Space(name = name, template = template, location = cleanLocation(location, capabilities), color = color),
         capabilities + SpaceCapabilities.TEXT,
     )
 

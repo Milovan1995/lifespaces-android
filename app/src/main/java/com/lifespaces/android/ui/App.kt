@@ -12,6 +12,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,6 +44,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -117,6 +121,7 @@ fun App(viewModel: AppViewModel) {
     var createCompletion by rememberSaveable { mutableStateOf(true) }
     var createDate by rememberSaveable { mutableStateOf(true) }
     var createLocation by rememberSaveable { mutableStateOf(true) }
+    var createSpaceColor by rememberSaveable { mutableStateOf<Long?>(null) }
     var editingSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
     var editingSpaceName by rememberSaveable { mutableStateOf("") }
     var editingSpaceLocation by rememberSaveable { mutableStateOf("") }
@@ -278,29 +283,18 @@ fun App(viewModel: AppViewModel) {
                                     spaces = state.spaces,
                                     showCompletion = false,
                                     showDateActions = true,
-                                    isExpanded = expandedItemId == item.id,
                                     isEditing = editingItemId == item.id,
                                     editingText = if (editingItemId == item.id) editingText else item.text,
                                     onToggleExpanded = {
-                                        expandedItemId = item.id.takeUnless { expandedItemId == it }
+                                        expandedItemId = item.id
                                         editingItemId = null
-                                    },
-                                    onEdit = {
-                                        editingItemId = item.id
-                                        editingText = item.text
                                     },
                                     onTextChange = { editingText = it },
                                     onSave = {
                                         viewModel.updateItemText(item.id, editingText)
                                         editingItemId = null
                                     },
-                                    onMove = { spaceId ->
-                                        viewModel.moveItem(item.id, spaceId)
-                                        expandedItemId = null
-                                    },
                                     onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
-                                    onSchedule = { scheduledAt -> viewModel.setItemScheduledAt(item.id, scheduledAt) },
-                                    onDelete = { deletingItemId = item.id },
                                 )
                             }
                         }
@@ -316,14 +310,21 @@ fun App(viewModel: AppViewModel) {
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.titleLarge,
                             )
-                            IconButton(onClick = { showSpaceCreator = !showSpaceCreator }) {
+                            IconButton(onClick = {
+                                spaceName = ""
+                                spaceLocation = ""
+                                spaceTemplate = "Shopping"
+                                createCompletion = true
+                                createDate = true
+                                createLocation = true
+                                createSpaceColor = null
+                                editingSpaceId = null
+                                expandedItemId = null
+                                showSpaceCreator = true
+                            }) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_add),
-                                    contentDescription = if (showSpaceCreator) {
-                                        "Zatvori kreiranje prostora"
-                                    } else {
-                                        "Dodaj prostor"
-                                    },
+                                    contentDescription = "Dodaj prostor",
                                 )
                             }
                         }
@@ -332,81 +333,6 @@ fun App(viewModel: AppViewModel) {
                                 "Još nema prostora. Dodirni + da kreiraš prvi.",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                        }
-                    }
-                    if (showSpaceCreator) {
-                        item {
-                            Text("Novi prostor", style = MaterialTheme.typography.titleMedium)
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(
-                                        value = spaceName,
-                                        onValueChange = { spaceName = it },
-                                        modifier = Modifier.weight(1f),
-                                        label = { Text("Naziv prostora") },
-                                        singleLine = true,
-                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                                    )
-                                    Box {
-                                        Button(onClick = { templateMenuExpanded = true }) {
-                                            Text("Šablon: $spaceTemplate")
-                                        }
-                                        DropdownMenu(
-                                            expanded = templateMenuExpanded,
-                                            onDismissRequest = { templateMenuExpanded = false },
-                                        ) {
-                                            listOf("Shopping", "General").forEach { template ->
-                                                DropdownMenuItem(
-                                                    text = { Text(template) },
-                                                    onClick = {
-                                                        spaceTemplate = template
-                                                        createCompletion = template == "Shopping"
-                                                        createDate = true
-                                                        createLocation = template == "Shopping"
-                                                        templateMenuExpanded = false
-                                                    },
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                Text(
-                                    "Šablon bira početne osobine; možeš ih promijeniti.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                                CapabilityCheckbox("Završavanje stavki", createCompletion) { createCompletion = it }
-                                CapabilityCheckbox("Datum", createDate) { createDate = it }
-                                CapabilityCheckbox("Lokacija", createLocation) { createLocation = it }
-                                if (createLocation) {
-                                    OutlinedTextField(
-                                        value = spaceLocation,
-                                        onValueChange = { spaceLocation = it },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        label = { Text("Lokacija (opciono)") },
-                                        singleLine = true,
-                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                    )
-                                }
-                                Button(
-                                    onClick = {
-                                        viewModel.createSpace(
-                                            spaceName,
-                                            spaceTemplate,
-                                            spaceLocation,
-                                            selectedCapabilities(createCompletion, createDate, createLocation),
-                                        )
-                                        spaceName = ""
-                                        spaceLocation = ""
-                                        showSpaceCreator = false
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = spaceName.isNotBlank(),
-                                ) { Text("Kreiraj prostor") }
-                                TextButton(
-                                    onClick = { showSpaceCreator = false },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) { Text("Otkaži") }
-                            }
                         }
                     }
                     state.spaces.forEach { space ->
@@ -517,7 +443,8 @@ fun App(viewModel: AppViewModel) {
                                             DropdownMenuItem(
                                                 text = { Text("Izmijeni prostor") },
                                                 onClick = {
-                                                    expandedSpaceId = space.id
+                                                    showSpaceCreator = false
+                                                    expandedItemId = null
                                                     editingSpaceId = space.id
                                                     editingSpaceName = space.name
                                                     editingSpaceLocation = space.location.orEmpty()
@@ -595,82 +522,6 @@ fun App(viewModel: AppViewModel) {
                                     }
                                 }
                             }
-                            if (editingSpaceId == space.id) {
-                                item(key = "space-edit-${space.id}") {
-                                    SpaceChild(accent = spaceAccent) {
-                                        Card(
-                                            shape = LifeSpacesCardShape,
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                            ),
-                                        ) {
-                                        Column(
-                                            modifier = Modifier.padding(16.dp),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                                        ) {
-                                            Text("Izmjena prostora", style = MaterialTheme.typography.titleMedium)
-                                            OutlinedTextField(
-                                                value = editingSpaceName,
-                                                onValueChange = { editingSpaceName = it },
-                                                modifier = Modifier.fillMaxWidth(),
-                                                label = { Text("Naziv prostora") },
-                                                singleLine = true,
-                                            )
-                                            CapabilityCheckbox(
-                                                "Završavanje stavki",
-                                                editingSpaceCompletion,
-                                            ) { editingSpaceCompletion = it }
-                                            CapabilityCheckbox("Datum", editingSpaceDate) { editingSpaceDate = it }
-                                            CapabilityCheckbox(
-                                                "Lokacija",
-                                                editingSpaceLocationEnabled,
-                                            ) { editingSpaceLocationEnabled = it }
-                                            if (editingSpaceLocationEnabled) {
-                                                OutlinedTextField(
-                                                    value = editingSpaceLocation,
-                                                    onValueChange = { editingSpaceLocation = it },
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    label = { Text("Lokacija (opciono)") },
-                                                    singleLine = true,
-                                                )
-                                            }
-                                            SpaceColorPicker(
-                                                selectedColor = editingSpaceColor,
-                                                onColorSelected = { editingSpaceColor = it },
-                                            )
-                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Button(
-                                                    onClick = {
-                                                        val removesData =
-                                                            (!editingSpaceCompletion && hasCompletion && spaceItems.any { it.completed != null }) ||
-                                                                (!editingSpaceDate && hasDate && spaceItems.any { it.scheduledAt != null }) ||
-                                                                (!editingSpaceLocationEnabled && hasLocation && !space.location.isNullOrBlank())
-                                                        if (removesData) {
-                                                            confirmingSpaceEditId = space.id
-                                                        } else {
-                                                            viewModel.updateSpace(
-                                                                space.id,
-                                                                editingSpaceName,
-                                                                editingSpaceLocation,
-                                                                editingSpaceColor,
-                                                                selectedCapabilities(
-                                                                    editingSpaceCompletion,
-                                                                    editingSpaceDate,
-                                                                    editingSpaceLocationEnabled,
-                                                                ),
-                                                            )
-                                                            editingSpaceId = null
-                                                        }
-                                                    },
-                                                    enabled = editingSpaceName.isNotBlank(),
-                                                ) { Text("Sačuvaj") }
-                                                TextButton(onClick = { editingSpaceId = null }) { Text("Otkaži") }
-                                            }
-                                        }
-                                        }
-                                    }
-                                }
-                            }
                             items(displayedItems, key = { "space-${space.id}-item-${it.id}" }) { item ->
                                 SpaceChild(accent = spaceAccent) {
                                     ItemCard(
@@ -678,35 +529,231 @@ fun App(viewModel: AppViewModel) {
                                     spaces = state.spaces,
                                     showCompletion = hasCompletion,
                                     showDateActions = hasDate || item.scheduledAt != null,
-                                    isExpanded = expandedItemId == item.id,
                                     isEditing = editingItemId == item.id,
                                     editingText = if (editingItemId == item.id) editingText else item.text,
                                     onToggleExpanded = {
-                                        expandedItemId = item.id.takeUnless { expandedItemId == it }
+                                        expandedItemId = item.id
                                         editingItemId = null
-                                    },
-                                    onEdit = {
-                                        editingItemId = item.id
-                                        editingText = item.text
                                     },
                                     onTextChange = { editingText = it },
                                     onSave = {
                                         viewModel.updateItemText(item.id, editingText)
                                         editingItemId = null
                                     },
-                                    onMove = { spaceId ->
-                                        viewModel.moveItem(item.id, spaceId)
-                                        expandedItemId = null
-                                    },
                                     onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
-                                    onSchedule = { scheduledAt -> viewModel.setItemScheduledAt(item.id, scheduledAt) },
-                                    onDelete = { deletingItemId = item.id },
                                     )
                                 }
                             }
                         }
                     }
             }
+        }
+        if (showSpaceCreator) {
+            ModalBottomSheet(
+                onDismissRequest = {
+                    showSpaceCreator = false
+                    templateMenuExpanded = false
+                },
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding()
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("Novi prostor", style = MaterialTheme.typography.headlineSmall)
+                    OutlinedTextField(
+                        value = spaceName,
+                        onValueChange = { spaceName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Naziv prostora") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    )
+                    Box {
+                        Button(onClick = { templateMenuExpanded = true }) {
+                            Text("Šablon: $spaceTemplate")
+                        }
+                        DropdownMenu(
+                            expanded = templateMenuExpanded,
+                            onDismissRequest = { templateMenuExpanded = false },
+                        ) {
+                            listOf("Shopping", "General").forEach { template ->
+                                DropdownMenuItem(
+                                    text = { Text(template) },
+                                    onClick = {
+                                        spaceTemplate = template
+                                        createCompletion = template == "Shopping"
+                                        createDate = true
+                                        createLocation = template == "Shopping"
+                                        templateMenuExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        "Šablon bira početne osobine; možeš ih odmah promijeniti.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    CapabilityCheckbox("Završavanje stavki", createCompletion) { createCompletion = it }
+                    CapabilityCheckbox("Datum", createDate) { createDate = it }
+                    CapabilityCheckbox("Lokacija", createLocation) { createLocation = it }
+                    if (createLocation) {
+                        OutlinedTextField(
+                            value = spaceLocation,
+                            onValueChange = { spaceLocation = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Lokacija (opciono)") },
+                            singleLine = true,
+                        )
+                    }
+                    SpaceColorPicker(
+                        selectedColor = createSpaceColor,
+                        onColorSelected = { createSpaceColor = it },
+                    )
+                    val previewAccent = createSpaceColor?.let { Color(it.toULong()) } ?: defaultSpaceAccent
+                    Card(
+                        shape = LifeSpacesCardShape,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(Modifier.fillMaxHeight().width(6.dp).background(previewAccent))
+                            Text(
+                                spaceName.ifBlank { "Naziv prostora" },
+                                modifier = Modifier.padding(16.dp),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            viewModel.createSpace(
+                                spaceName,
+                                spaceTemplate,
+                                spaceLocation,
+                                selectedCapabilities(createCompletion, createDate, createLocation),
+                                createSpaceColor,
+                            )
+                            showSpaceCreator = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = spaceName.isNotBlank(),
+                    ) { Text("Kreiraj prostor") }
+                    TextButton(
+                        onClick = { showSpaceCreator = false },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Otkaži") }
+                }
+            }
+        } else {
+            editingSpaceId?.let { spaceId ->
+                state.spaces.firstOrNull { it.id == spaceId }?.let { space ->
+                    val capabilities = state.capabilities[spaceId] ?: SpaceCapabilities.defaults(space.template)
+                    val hasCompletion = SpaceCapabilities.COMPLETION in capabilities
+                    val hasDate = SpaceCapabilities.DATE in capabilities
+                    val hasLocation = SpaceCapabilities.LOCATION in capabilities
+                    val spaceItems = state.items.filter { it.spaceId == spaceId }
+                    ModalBottomSheet(onDismissRequest = { editingSpaceId = null }) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding()
+                                .padding(horizontal = 24.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text("Izmijeni prostor", style = MaterialTheme.typography.headlineSmall)
+                            OutlinedTextField(
+                                value = editingSpaceName,
+                                onValueChange = { editingSpaceName = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Naziv prostora") },
+                                singleLine = true,
+                            )
+                            CapabilityCheckbox(
+                                "Završavanje stavki",
+                                editingSpaceCompletion,
+                            ) { editingSpaceCompletion = it }
+                            CapabilityCheckbox("Datum", editingSpaceDate) { editingSpaceDate = it }
+                            CapabilityCheckbox(
+                                "Lokacija",
+                                editingSpaceLocationEnabled,
+                            ) { editingSpaceLocationEnabled = it }
+                            if (editingSpaceLocationEnabled) {
+                                OutlinedTextField(
+                                    value = editingSpaceLocation,
+                                    onValueChange = { editingSpaceLocation = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text("Lokacija (opciono)") },
+                                    singleLine = true,
+                                )
+                            }
+                            SpaceColorPicker(
+                                selectedColor = editingSpaceColor,
+                                onColorSelected = { editingSpaceColor = it },
+                            )
+                            Button(
+                                onClick = {
+                                    val removesData =
+                                        (!editingSpaceCompletion && hasCompletion && spaceItems.any { it.completed != null }) ||
+                                            (!editingSpaceDate && hasDate && spaceItems.any { it.scheduledAt != null }) ||
+                                            (!editingSpaceLocationEnabled && hasLocation && !space.location.isNullOrBlank())
+                                    if (removesData) {
+                                        confirmingSpaceEditId = spaceId
+                                    } else {
+                                        viewModel.updateSpace(
+                                            spaceId,
+                                            editingSpaceName,
+                                            editingSpaceLocation,
+                                            editingSpaceColor,
+                                            selectedCapabilities(
+                                                editingSpaceCompletion,
+                                                editingSpaceDate,
+                                                editingSpaceLocationEnabled,
+                                            ),
+                                        )
+                                        editingSpaceId = null
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = editingSpaceName.isNotBlank(),
+                            ) { Text("Sačuvaj izmjene") }
+                            TextButton(
+                                onClick = { editingSpaceId = null },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Otkaži") }
+                        }
+                    }
+                }
+            }
+        }
+        state.items.firstOrNull { it.id == expandedItemId }?.let { selectedItem ->
+            val showDateActions = selectedItem.spaceId == null ||
+                selectedItem.scheduledAt != null ||
+                SpaceCapabilities.DATE in state.capabilities[selectedItem.spaceId].orEmpty()
+            ItemActionsSheet(
+                item = selectedItem,
+                spaces = state.spaces,
+                showDateActions = showDateActions,
+                onDismiss = { expandedItemId = null },
+                onEdit = {
+                    expandedItemId = null
+                    editingItemId = selectedItem.id
+                    editingText = selectedItem.text
+                },
+                onMove = { destination ->
+                    viewModel.moveItem(selectedItem.id, destination)
+                    expandedItemId = null
+                },
+                onSchedule = { scheduledAt ->
+                    viewModel.setItemScheduledAt(selectedItem.id, scheduledAt)
+                    expandedItemId = null
+                },
+                onDelete = {
+                    expandedItemId = null
+                    deletingItemId = selectedItem.id
+                },
+            )
         }
         deletingItemId?.let { itemId ->
             AlertDialog(
@@ -890,21 +937,13 @@ private fun ItemCard(
     spaces: List<Space>,
     showCompletion: Boolean,
     showDateActions: Boolean,
-    isExpanded: Boolean,
     isEditing: Boolean,
     editingText: String,
     onToggleExpanded: () -> Unit,
-    onEdit: () -> Unit,
     onTextChange: (String) -> Unit,
     onSave: () -> Unit,
-    onMove: (Long?) -> Unit,
     onCompletedChange: (Boolean) -> Unit,
-    onSchedule: (Long?) -> Unit,
-    onDelete: () -> Unit,
 ) {
-    var menuExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
-    var dateMenuExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
-    val context = LocalContext.current
     val completed = showCompletion && item.completed == true
     val activeCardColor = spaces.firstOrNull { it.id == item.spaceId }?.color?.let { color ->
         lerp(
@@ -913,24 +952,6 @@ private fun ItemCard(
             if (MaterialTheme.colorScheme.background.luminance() < 0.5f) 0.25f else 0.20f,
         )
     } ?: MaterialTheme.colorScheme.surface
-    val showDatePicker = {
-        val calendar = Calendar.getInstance().apply {
-            item.scheduledAt?.let { timeInMillis = it }
-        }
-        DatePickerDialog(
-            context,
-            { _, year, month, day ->
-                Calendar.getInstance().apply {
-                    set(year, month, day, 0, 0, 0)
-                    set(Calendar.MILLISECOND, 0)
-                    onSchedule(timeInMillis)
-                }
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH),
-        ).show()
-    }
     val cardColor by animateColorAsState(
         targetValue = if (completed) {
             MaterialTheme.colorScheme.surfaceVariant
@@ -999,83 +1020,117 @@ private fun ItemCard(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                if (isExpanded) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onEdit) { Text("Uredi") }
-                        TextButton(onClick = { menuExpanded = true }) { Text("Premjesti") }
-                        TextButton(onClick = onDelete) { Text("Obriši") }
-                        if (showDateActions) {
-                            Box {
-                                IconButton(onClick = { dateMenuExpanded = true }) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.ic_calendar),
-                                        contentDescription = "Datum i kalendar",
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = dateMenuExpanded,
-                                    onDismissRequest = { dateMenuExpanded = false },
-                                ) {
-                                DropdownMenuItem(
-                                    text = { Text(if (item.scheduledAt == null) "Dodaj datum" else "Promijeni datum") },
-                                    onClick = {
-                                        dateMenuExpanded = false
-                                        showDatePicker()
-                                    },
-                                )
-                                if (item.scheduledAt != null) {
-                                    DropdownMenuItem(
-                                        text = { Text("Ukloni datum") },
-                                        onClick = {
-                                            dateMenuExpanded = false
-                                            onSchedule(null)
-                                        },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Dodaj u kalendar") },
-                                        onClick = {
-                                            dateMenuExpanded = false
-                                            val location = spaces.firstOrNull { it.id == item.spaceId }?.location
-                                            try {
-                                                context.startActivity(createCalendarInsertIntent(item, location))
-                                            } catch (_: ActivityNotFoundException) {
-                                                Toast.makeText(
-                                                    context,
-                                                    "Nije pronađena aplikacija kalendara.",
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                            }
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false },
-                    ) {
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ItemActionsSheet(
+    item: Item,
+    spaces: List<Space>,
+    showDateActions: Boolean,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onMove: (Long?) -> Unit,
+    onSchedule: (Long?) -> Unit,
+    onDelete: () -> Unit,
+) {
+    val context = LocalContext.current
+    var moveMenuExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
+    val showDatePicker = {
+        val calendar = Calendar.getInstance().apply {
+            item.scheduledAt?.let { timeInMillis = it }
+        }
+        onDismiss()
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                Calendar.getInstance().apply {
+                    set(year, month, day, 0, 0, 0)
+                    set(Calendar.MILLISECOND, 0)
+                    onSchedule(timeInMillis)
+                }
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH),
+        ).show()
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(item.text, style = MaterialTheme.typography.titleLarge)
+            item.scheduledAt?.let {
+                Text(
+                    SimpleDateFormat("d. MMM yyyy.", Locale.getDefault()).format(Date(it)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            SheetAction("Uredi", onClick = onEdit)
+            Box {
+                SheetAction("Premjesti") { moveMenuExpanded = true }
+                DropdownMenu(
+                    expanded = moveMenuExpanded,
+                    onDismissRequest = { moveMenuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Nesortirano") },
+                        onClick = {
+                            moveMenuExpanded = false
+                            onMove(null)
+                        },
+                    )
+                    spaces.forEach { space ->
                         DropdownMenuItem(
-                            text = { Text("Nesortirano") },
+                            text = { Text(space.name) },
                             onClick = {
-                                onMove(null)
-                                menuExpanded = false
+                                moveMenuExpanded = false
+                                onMove(space.id)
                             },
                         )
-                        spaces.forEach { space ->
-                            DropdownMenuItem(
-                                text = { Text(space.name) },
-                                onClick = {
-                                    onMove(space.id)
-                                    menuExpanded = false
-                                },
-                            )
+                    }
+                }
+            }
+            if (showDateActions) {
+                SheetAction(if (item.scheduledAt == null) "Dodaj datum" else "Promijeni datum") {
+                    showDatePicker()
+                }
+                if (item.scheduledAt != null) {
+                    SheetAction("Ukloni datum") { onSchedule(null) }
+                    SheetAction("Dodaj u kalendar") {
+                        onDismiss()
+                        val location = spaces.firstOrNull { it.id == item.spaceId }?.location
+                        try {
+                            context.startActivity(createCalendarInsertIntent(item, location))
+                        } catch (_: ActivityNotFoundException) {
+                            Toast.makeText(
+                                context,
+                                "Nije pronađena aplikacija kalendara.",
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         }
                     }
                 }
             }
+            SheetAction("Obriši", color = MaterialTheme.colorScheme.error, onClick = onDelete)
         }
+    }
+}
+
+@Composable
+private fun SheetAction(
+    label: String,
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    onClick: () -> Unit,
+) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Text(label, modifier = Modifier.fillMaxWidth(), color = color)
     }
 }
 
@@ -1169,17 +1224,12 @@ private fun ItemCardPreview() {
             spaces = listOf(Space(id = 2, name = "Voli", template = "Shopping")),
             showCompletion = true,
             showDateActions = true,
-            isExpanded = false,
             isEditing = false,
             editingText = "Mlijeko",
             onToggleExpanded = {},
-            onEdit = {},
             onTextChange = {},
             onSave = {},
-            onMove = {},
             onCompletedChange = {},
-            onSchedule = {},
-            onDelete = {},
         )
     }
 }
