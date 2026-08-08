@@ -25,9 +25,10 @@ time-based items can also be displayed in a unified calendar.
 ## Project status
 
 The Android MVP is under active development. The current build supports text
-capture into Nesortirano, custom spaces, moving and editing items, Shopping
-completion, and destructive-action confirmations. Calendar, reminders,
-advanced sorting, and additional templates are still in progress.
+capture into Nesortirano, custom spaces with optional locations, moving and
+editing items, Shopping completion, all-day dates, basic date sorting, and
+destructive-action confirmations. Reminders, drag-and-drop ordering, and
+additional templates are still in progress.
 
 ## Main product goals
 
