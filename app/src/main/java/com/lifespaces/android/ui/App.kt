@@ -32,6 +32,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -53,6 +55,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -63,6 +66,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import com.lifespaces.android.R
 import com.lifespaces.android.data.Item
 import com.lifespaces.android.data.Space
 import java.text.SimpleDateFormat
@@ -440,7 +444,26 @@ private fun ItemCard(
     onDelete: () -> Unit,
 ) {
     var menuExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
+    var dateMenuExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
     val context = LocalContext.current
+    val showDatePicker = {
+        val calendar = Calendar.getInstance().apply {
+            item.scheduledAt?.let { timeInMillis = it }
+        }
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                Calendar.getInstance().apply {
+                    set(year, month, day, 0, 0, 0)
+                    set(Calendar.MILLISECOND, 0)
+                    onSchedule(timeInMillis)
+                }
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH),
+        ).show()
+    }
     val cardColor by animateColorAsState(
         targetValue = if (item.completed == true) {
             MaterialTheme.colorScheme.primaryContainer
@@ -511,39 +534,51 @@ private fun ItemCard(
                         TextButton(onClick = onEdit) { Text("Uredi") }
                         TextButton(onClick = { menuExpanded = true }) { Text("Premjesti") }
                         TextButton(onClick = onDelete) { Text("Obriši") }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            val calendar = Calendar.getInstance().apply {
-                                item.scheduledAt?.let { timeInMillis = it }
+                        Box {
+                            IconButton(onClick = { dateMenuExpanded = true }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_calendar),
+                                    contentDescription = "Datum i kalendar",
+                                )
                             }
-                            DatePickerDialog(
-                                context,
-                                { _, year, month, day ->
-                                    Calendar.getInstance().apply {
-                                        set(year, month, day, 0, 0, 0)
-                                        set(Calendar.MILLISECOND, 0)
-                                        onSchedule(timeInMillis)
-                                    }
-                                },
-                                calendar.get(Calendar.YEAR),
-                                calendar.get(Calendar.MONTH),
-                                calendar.get(Calendar.DAY_OF_MONTH),
-                            ).show()
-                        }) { Text(if (item.scheduledAt == null) "Dodaj datum" else "Promijeni datum") }
-                        if (item.scheduledAt != null) {
-                            TextButton(onClick = { onSchedule(null) }) { Text("Ukloni datum") }
+                            DropdownMenu(
+                                expanded = dateMenuExpanded,
+                                onDismissRequest = { dateMenuExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(if (item.scheduledAt == null) "Dodaj datum" else "Promijeni datum") },
+                                    onClick = {
+                                        dateMenuExpanded = false
+                                        showDatePicker()
+                                    },
+                                )
+                                if (item.scheduledAt != null) {
+                                    DropdownMenuItem(
+                                        text = { Text("Ukloni datum") },
+                                        onClick = {
+                                            dateMenuExpanded = false
+                                            onSchedule(null)
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Dodaj u kalendar") },
+                                        onClick = {
+                                            dateMenuExpanded = false
+                                            val location = spaces.firstOrNull { it.id == item.spaceId }?.location
+                                            try {
+                                                context.startActivity(createCalendarInsertIntent(item, location))
+                                            } catch (_: ActivityNotFoundException) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Nije pronađena aplikacija kalendara.",
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            }
+                                        },
+                                    )
+                                }
+                            }
                         }
-                    }
-                    if (item.scheduledAt != null) {
-                        TextButton(onClick = {
-                            val location = spaces.firstOrNull { it.id == item.spaceId }?.location
-                            try {
-                                context.startActivity(createCalendarInsertIntent(item, location))
-                            } catch (_: ActivityNotFoundException) {
-                                Toast.makeText(context, "Nije pronađena aplikacija kalendara.", Toast.LENGTH_SHORT).show()
-                            }
-                        }) { Text("Dodaj u kalendar") }
                     }
                     DropdownMenu(
                         expanded = menuExpanded,
