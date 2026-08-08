@@ -57,7 +57,14 @@ fun App(viewModel: AppViewModel) {
     var editingText by rememberSaveable { mutableStateOf("") }
     var deletingItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
-    val inboxItems = state.items.filter { it.spaceId == null }
+    var sortByDate by rememberSaveable { mutableStateOf(false) }
+    val inboxItems = state.items.filter { it.spaceId == null }.let { items ->
+        if (sortByDate) {
+            items.sortedWith(compareBy<Item> { it.scheduledAt == null }.thenBy { it.scheduledAt ?: Long.MAX_VALUE })
+        } else {
+            items
+        }
+    }
 
     MaterialTheme {
         Scaffold(
@@ -132,7 +139,14 @@ fun App(viewModel: AppViewModel) {
                     )
                 }
                 item { HorizontalDivider() }
-                item { Text("Prostori (${state.spaces.size})") }
+                item {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text("Prostori (${state.spaces.size})", modifier = Modifier.weight(1f))
+                        TextButton(onClick = { sortByDate = !sortByDate }) {
+                            Text(if (sortByDate) "Prikaz: datum" else "Prikaz: novo")
+                        }
+                    }
+                }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -191,6 +205,11 @@ fun App(viewModel: AppViewModel) {
                 }
                 state.spaces.forEach { space ->
                     val spaceItems = state.items.filter { it.spaceId == space.id }
+                    val displayedSpaceItems = if (sortByDate) {
+                        spaceItems.sortedWith(compareBy<Item> { it.scheduledAt == null }.thenBy { it.scheduledAt ?: Long.MAX_VALUE })
+                    } else {
+                        spaceItems
+                    }
                     item(key = "space-${space.id}") {
                         Row {
                             Column(modifier = Modifier.weight(1f)) {
@@ -213,7 +232,7 @@ fun App(viewModel: AppViewModel) {
                             )
                         }
                     }
-                    items(spaceItems, key = { it.id }) { item ->
+                    items(displayedSpaceItems, key = { it.id }) { item ->
                         ItemCard(
                             item = item,
                             spaces = state.spaces,
