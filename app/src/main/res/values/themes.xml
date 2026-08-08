@@ -1,3 +1,4 @@
 <resources>
     <style name="Theme.LifeSpaces" parent="@android:style/Theme.DeviceDefault.NoActionBar" />
+    <style name="Theme.LifeSpaces.WidgetDialog" parent="@android:style/Theme.DeviceDefault.Dialog.NoActionBar" />
 </resources>

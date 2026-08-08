@@ -13,5 +13,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".widget.SpaceWidgetConfigActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".widget.SpaceWidgetCaptureActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LifeSpaces.WidgetDialog" />
+        <receiver
+            android:name=".widget.SpaceWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/space_widget_info" />
+        </receiver>
     </application>
 </manifest>

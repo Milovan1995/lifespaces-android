@@ -49,6 +49,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -85,6 +86,7 @@ import com.lifespaces.android.R
 import com.lifespaces.android.data.Item
 import com.lifespaces.android.data.Space
 import com.lifespaces.android.data.SpaceCapabilities
+import com.lifespaces.android.widget.SpaceWidget
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -141,6 +143,9 @@ fun App(viewModel: AppViewModel) {
         targetValue = if (inboxExpanded) 180f else 0f,
         label = "inbox expansion",
     )
+    LaunchedEffect(state.spaces) {
+        SpaceWidget.updateAll(context)
+    }
     LifeSpacesTheme(darkTheme = darkTheme) {
         val defaultSpaceAccent = MaterialTheme.colorScheme.primary
         val inboxAccent = MaterialTheme.colorScheme.secondary
@@ -1133,7 +1138,7 @@ private val LifeSpacesDarkColors = darkColorScheme(
 )
 
 @Composable
-private fun LifeSpacesTheme(darkTheme: Boolean, content: @Composable () -> Unit) {
+internal fun LifeSpacesTheme(darkTheme: Boolean, content: @Composable () -> Unit) {
     val colors = if (darkTheme) LifeSpacesDarkColors else LifeSpacesLightColors
     val view = LocalView.current
     SideEffect {
