@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
+    android:id="@android:id/background"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
@@ -13,26 +13,44 @@
         android:layout_height="match_parent"
         android:background="#5D4BB7" />
 
-    <TextView
-        android:id="@+id/widget_space_name"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
         android:gravity="center_vertical"
-        android:maxLines="2"
-        android:paddingHorizontal="16dp"
-        android:text="LifeSpaces"
-        android:textColor="@color/widget_text"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:id="@+id/widget_space_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="LifeSpaces"
+            android:textColor="@color/widget_text"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Brzi unos"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="12sp" />
+    </LinearLayout>
 
     <ImageButton
         android:id="@+id/widget_add"
-        android:layout_width="56dp"
-        android:layout_height="match_parent"
-        android:background="@android:color/transparent"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/widget_add_background"
         android:contentDescription="Dodaj stavku"
-        android:padding="16dp"
+        android:padding="12dp"
         android:src="@drawable/ic_add"
-        android:tint="@color/widget_text" />
+        android:tint="#FFFFFFFF" />
 </LinearLayout>

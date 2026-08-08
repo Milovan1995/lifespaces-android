@@ -1,3 +1,4 @@
 <resources>
     <color name="widget_text">#E6EAF2</color>
+    <color name="widget_text_secondary">#BCC4D1</color>
 </resources>

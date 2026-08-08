@@ -84,16 +84,24 @@ object SpaceWidget {
 
     fun update(context: Context, manager: AppWidgetManager, appWidgetId: Int, spaces: List<Space>) {
         val configuredSpaceId = spaceId(context, appWidgetId)
-        val inbox = configuredSpaceId == 0L
+        val inbox = configuredSpaceId == null || configuredSpaceId == 0L
         val space = configuredSpaceId?.takeIf { it > 0 }?.let { id -> spaces.firstOrNull { it.id == id } }
         val configured = inbox || space != null
         val views = RemoteViews(context.packageName, R.layout.space_widget)
         views.setTextViewText(
             R.id.widget_space_name,
             when {
-                inbox -> "Nesortirano"
+                inbox -> "LifeSpaces"
                 space != null -> space.name
                 else -> "Izaberi prostor"
+            },
+        )
+        views.setTextViewText(
+            R.id.widget_subtitle,
+            when {
+                inbox -> "Brzi unos"
+                space != null -> "LifeSpaces"
+                else -> "Prostor više ne postoji"
             },
         )
         views.setInt(
@@ -201,7 +209,7 @@ class SpaceWidgetCaptureActivity : ComponentActivity() {
         val repository = (application as LifeSpacesApplication).repository
         lifecycleScope.launch {
             val configuredSpaceId = SpaceWidget.spaceId(this@SpaceWidgetCaptureActivity, appWidgetId)
-            if (configuredSpaceId == 0L) {
+            if (configuredSpaceId == null || configuredSpaceId == 0L) {
                 targetName = "Nesortirano"
                 validTarget = true
             } else {
