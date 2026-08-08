@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -88,5 +89,65 @@ class LifeSpacesRepositoryTest {
 
         repository.setItemScheduledAt(itemId, null)
         assertEquals(null, repository.items.first().single().scheduledAt)
+    }
+
+    @Test
+    fun homeFeed_derivesDefaultsForLegacySpaces() = runTest {
+        val shoppingId = db.spaceDao().insert(Space(name = "Shop", template = "Shopping"))
+        val generalId = db.spaceDao().insert(Space(name = "Home", template = "General", location = "Kitchen"))
+
+        val capabilities = repository.homeFeed.first().capabilities
+
+        assertEquals(SpaceCapabilities.shopping, capabilities[shoppingId])
+        assertEquals(SpaceCapabilities.general + SpaceCapabilities.LOCATION, capabilities[generalId])
+    }
+
+    @Test
+    fun configuredCapabilities_arePersistedAndAlwaysIncludeText() = runTest {
+        val spaceId = repository.createSpace(
+            name = "Home",
+            template = "General",
+            capabilities = setOf(SpaceCapabilities.LOCATION),
+            location = " Kitchen ",
+        )
+
+        repository.updateSpace(spaceId, " House ", null, null, setOf(SpaceCapabilities.COMPLETION))
+
+        val feed = repository.homeFeed.first()
+        assertEquals("House", feed.spaces.single().name)
+        assertEquals(setOf(SpaceCapabilities.TEXT, SpaceCapabilities.COMPLETION), feed.capabilities[spaceId])
+    }
+
+    @Test
+    fun disablingCapabilities_canClearTheirItemData() = runTest {
+        val spaceId = repository.createSpace("Shop", template = "Shopping")
+        val itemId = repository.createItem("Milk", spaceId)
+        repository.setItemCompleted(itemId, true)
+        repository.setItemScheduledAt(itemId, 1_700_000_000_000)
+
+        repository.updateSpace(
+            spaceId = spaceId,
+            name = "Shop",
+            location = null,
+            color = null,
+            capabilities = setOf(SpaceCapabilities.TEXT),
+            clearCompleted = true,
+            clearScheduledAt = true,
+        )
+
+        val item = repository.items.first().single()
+        assertNull(item.completed)
+        assertNull(item.scheduledAt)
+    }
+
+    @Test
+    fun spaceColor_canBeChangedAndCleared() = runTest {
+        val spaceId = repository.createSpace("Home", template = "General")
+
+        repository.updateSpace(spaceId, "Home", null, 123L, SpaceCapabilities.general)
+        assertEquals(123L, repository.spaces.first().single().color)
+
+        repository.updateSpace(spaceId, "Home", null, null, SpaceCapabilities.general)
+        assertNull(repository.spaces.first().single().color)
     }
 }
