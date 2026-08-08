@@ -1,6 +1,6 @@
 # LifeSpaces
 
-LifeSpaces is an Android-first, voice-first modular personal organiser.
+LifeSpaces is an Android-first, offline-first modular personal organiser.
 
 The application is designed for quickly capturing notes, tasks, reminders,
 events, shopping items, maintenance records, repairs, ideas, and other everyday
@@ -24,11 +24,12 @@ time-based items can also be displayed in a unified calendar.
 
 ## Project status
 
-The Android MVP is under active development. The current build supports text
-capture into Nesortirano, custom spaces with optional locations, moving and
-editing items, Shopping completion, all-day dates, basic date sorting, and
-destructive-action confirmations. Reminders, drag-and-drop ordering, and
-additional templates are still in progress.
+The Android MVP is under active development. The current build supports quick
+text capture into Nesortirano or directly into a space, configurable space
+capabilities and colours, moving and editing items, completion, all-day dates,
+date sorting, light and dark themes, system-calendar export, and a configurable
+home-screen quick-capture widget. Reminders, recurrence, global search,
+backup/export, and additional templates are still in progress.
 
 ## Main product goals
 
@@ -84,6 +85,9 @@ Architecture decisions are documented in:
 ```text
 docs/architecture/
 ```
+
+The proposed order for the next product improvements is documented in
+[the product roadmap](docs/product/07-product-roadmap.md).
 
 ## Author
 
