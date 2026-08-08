@@ -6,7 +6,9 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.provider.CalendarContract
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -83,6 +85,8 @@ fun App(viewModel: AppViewModel) {
     var deletingItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
     var sortByDate by rememberSaveable { mutableStateOf(false) }
+    var selectedSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var expandedItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     val systemDarkTheme = isSystemInDarkTheme()
     val appearance = remember(context) { context.getSharedPreferences("appearance", 0) }
     var darkTheme by rememberSaveable {
@@ -97,13 +101,29 @@ fun App(viewModel: AppViewModel) {
             items
         }
     }
+    val selectedSpace = state.spaces.firstOrNull { it.id == selectedSpaceId }
+
+    BackHandler(enabled = selectedSpace != null) {
+        selectedSpaceId = null
+        expandedItemId = null
+        editingItemId = null
+    }
 
     LifeSpacesTheme(darkTheme = darkTheme) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text("LifeSpaces") },
+                    title = { Text(selectedSpace?.name ?: "LifeSpaces") },
+                    navigationIcon = {
+                        if (selectedSpace != null) {
+                            TextButton(onClick = {
+                                selectedSpaceId = null
+                                expandedItemId = null
+                                editingItemId = null
+                            }) { Text("Nazad") }
+                        }
+                    },
                     actions = {
                         TextButton(onClick = {
                             darkTheme = !darkTheme
@@ -131,174 +151,71 @@ fun App(viewModel: AppViewModel) {
                     .padding(horizontal = 16.dp, vertical = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                item {
-                    Text("Brzi unos", style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        "Zapiši ideju, zadatak ili podsjetnik. Kasnije ga možeš premjestiti u prostor.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                item {
-                    Card(
-                        shape = LifeSpacesCardShape,
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            OutlinedTextField(
-                                value = captureText,
-                                onValueChange = viewModel::onCaptureTextChange,
-                                modifier = Modifier.fillMaxWidth(),
-                                label = { Text("Nova stavka") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                keyboardActions = KeyboardActions(onDone = { viewModel.saveCapture() }),
-                            )
-                            Button(
-                                onClick = viewModel::saveCapture,
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = captureText.isNotBlank(),
-                            ) { Text("Sačuvaj") }
-                        }
-                    }
-                }
-                item {
-                    Text("Nesortirano (${inboxItems.size})", style = MaterialTheme.typography.titleMedium)
-                    if (inboxItems.isEmpty()) {
-                        Text(
-                            "Nesortirano je prazno. Sačuvane stavke će se pojaviti ovdje.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
-                items(inboxItems, key = { it.id }) { item ->
-                    ItemCard(
-                        item = item,
-                        spaces = state.spaces,
-                        showCompletion = false,
-                        isEditing = editingItemId == item.id,
-                        editingText = if (editingItemId == item.id) editingText else item.text,
-                        onEdit = {
-                            editingItemId = item.id
-                            editingText = item.text
-                        },
-                        onTextChange = { editingText = it },
-                        onSave = {
-                            viewModel.updateItemText(item.id, editingText)
-                            editingItemId = null
-                        },
-                        onMove = { spaceId -> viewModel.moveItem(item.id, spaceId) },
-                        onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
-                        onSchedule = { scheduledAt -> viewModel.setItemScheduledAt(item.id, scheduledAt) },
-                        onDelete = { deletingItemId = item.id },
-                    )
-                }
-                item { HorizontalDivider() }
-                item {
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text("Prostori (${state.spaces.size})", modifier = Modifier.weight(1f))
-                        TextButton(onClick = { sortByDate = !sortByDate }) {
-                            Text(if (sortByDate) "Prikaz: datum" else "Prikaz: novo")
-                        }
-                    }
-                }
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = spaceName,
-                                onValueChange = { spaceName = it },
-                                modifier = Modifier.weight(1f),
-                                label = { Text("Novi prostor") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                            )
-                            Box {
-                                Button(onClick = { templateMenuExpanded = true }) {
-                                    Text("Šablon: $spaceTemplate")
-                                }
-                                DropdownMenu(
-                                    expanded = templateMenuExpanded,
-                                    onDismissRequest = { templateMenuExpanded = false },
-                                ) {
-                                    listOf("Shopping", "General").forEach { template ->
-                                        DropdownMenuItem(
-                                            text = { Text(template) },
-                                            onClick = {
-                                                spaceTemplate = template
-                                                templateMenuExpanded = false
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        OutlinedTextField(
-                            value = spaceLocation,
-                            onValueChange = { spaceLocation = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Lokacija (opciono)") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        )
-                        Button(
-                            onClick = {
-                                viewModel.createSpace(spaceName, spaceTemplate, spaceLocation)
-                                spaceName = ""
-                                spaceLocation = ""
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = spaceName.isNotBlank(),
-                        ) { Text("Kreiraj prostor") }
-                    }
-                }
-                if (state.spaces.isEmpty()) {
+                if (selectedSpace == null) {
                     item {
+                        Text("Brzi unos", style = MaterialTheme.typography.headlineSmall)
                         Text(
-                            "Još nema prostora. Kreiraj prvi iznad da organizuješ stavke.",
+                            "Zapiši ideju, zadatak ili podsjetnik. Kasnije ga možeš premjestiti u prostor.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
-                }
-                state.spaces.forEach { space ->
-                    val spaceItems = state.items.filter { it.spaceId == space.id }
-                    val displayedSpaceItems = if (sortByDate) {
-                        spaceItems.sortedWith(compareBy<Item> { it.scheduledAt == null }.thenBy { it.scheduledAt ?: Long.MAX_VALUE })
-                    } else {
-                        spaceItems
-                    }
-                    item(key = "space-${space.id}") {
-                        Row {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "${space.name} (${spaceItems.size})",
-                                    style = MaterialTheme.typography.titleMedium,
+                    item {
+                        Card(
+                            shape = LifeSpacesCardShape,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                OutlinedTextField(
+                                    value = captureText,
+                                    onValueChange = viewModel::onCaptureTextChange,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text("Nova stavka") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                    keyboardActions = KeyboardActions(onDone = { viewModel.saveCapture() }),
                                 )
-                                space.location?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                            }
-                            TextButton(onClick = { deletingSpaceId = space.id }) {
-                                Text("Obriši prostor")
+                                Button(
+                                    onClick = viewModel::saveCapture,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = captureText.isNotBlank(),
+                                ) { Text("Sačuvaj") }
                             }
                         }
                     }
-                    if (spaceItems.isEmpty()) {
-                        item {
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth()) {
                             Text(
-                                "Ovaj prostor još nema stavki.",
+                                "Nesortirano (${inboxItems.size})",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            TextButton(onClick = { sortByDate = !sortByDate }) {
+                                Text(if (sortByDate) "Po datumu" else "Najnovije")
+                            }
+                        }
+                        if (inboxItems.isEmpty()) {
+                            Text(
+                                "Nesortirano je prazno. Sačuvane stavke će se pojaviti ovdje.",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
                     }
-                    items(displayedSpaceItems, key = { it.id }) { item ->
+                    items(inboxItems, key = { "inbox-${it.id}" }) { item ->
                         ItemCard(
                             item = item,
                             spaces = state.spaces,
-                            showCompletion = space.template == "Shopping",
+                            showCompletion = false,
+                            isExpanded = expandedItemId == item.id,
                             isEditing = editingItemId == item.id,
                             editingText = if (editingItemId == item.id) editingText else item.text,
+                            onToggleExpanded = {
+                                expandedItemId = item.id.takeUnless { expandedItemId == it }
+                                editingItemId = null
+                            },
                             onEdit = {
                                 editingItemId = item.id
                                 editingText = item.text
@@ -308,7 +225,151 @@ fun App(viewModel: AppViewModel) {
                                 viewModel.updateItemText(item.id, editingText)
                                 editingItemId = null
                             },
-                            onMove = { spaceId -> viewModel.moveItem(item.id, spaceId) },
+                            onMove = { spaceId ->
+                                viewModel.moveItem(item.id, spaceId)
+                                expandedItemId = null
+                            },
+                            onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
+                            onSchedule = { scheduledAt -> viewModel.setItemScheduledAt(item.id, scheduledAt) },
+                            onDelete = { deletingItemId = item.id },
+                        )
+                    }
+                    item { HorizontalDivider() }
+                    item {
+                        Text("Prostori (${state.spaces.size})", style = MaterialTheme.typography.titleLarge)
+                        if (state.spaces.isEmpty()) {
+                            Text(
+                                "Još nema prostora. Kreiraj prvi ispod da organizuješ stavke.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                    state.spaces.forEach { space ->
+                        val itemCount = state.items.count { it.spaceId == space.id }
+                        item(key = "space-${space.id}") {
+                            Card(
+                                onClick = {
+                                    selectedSpaceId = space.id
+                                    expandedItemId = null
+                                    editingItemId = null
+                                },
+                                shape = LifeSpacesCardShape,
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(space.name, style = MaterialTheme.typography.titleMedium)
+                                        space.location?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                                        Text("$itemCount stavki", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    Text("Otvori", color = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                    }
+                    item { HorizontalDivider() }
+                    item {
+                        Text("Novi prostor", style = MaterialTheme.typography.titleMedium)
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = spaceName,
+                                    onValueChange = { spaceName = it },
+                                    modifier = Modifier.weight(1f),
+                                    label = { Text("Naziv prostora") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                )
+                                Box {
+                                    Button(onClick = { templateMenuExpanded = true }) {
+                                        Text("Šablon: $spaceTemplate")
+                                    }
+                                    DropdownMenu(
+                                        expanded = templateMenuExpanded,
+                                        onDismissRequest = { templateMenuExpanded = false },
+                                    ) {
+                                        listOf("Shopping", "General").forEach { template ->
+                                            DropdownMenuItem(
+                                                text = { Text(template) },
+                                                onClick = {
+                                                    spaceTemplate = template
+                                                    templateMenuExpanded = false
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            OutlinedTextField(
+                                value = spaceLocation,
+                                onValueChange = { spaceLocation = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Lokacija (opciono)") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            )
+                            Button(
+                                onClick = {
+                                    viewModel.createSpace(spaceName, spaceTemplate, spaceLocation)
+                                    spaceName = ""
+                                    spaceLocation = ""
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = spaceName.isNotBlank(),
+                            ) { Text("Kreiraj prostor") }
+                        }
+                    }
+                } else {
+                    val spaceItems = state.items.filter { it.spaceId == selectedSpace.id }
+                    val displayedItems = if (sortByDate) {
+                        spaceItems.sortedWith(compareBy<Item> { it.scheduledAt == null }.thenBy { it.scheduledAt ?: Long.MAX_VALUE })
+                    } else {
+                        spaceItems
+                    }
+                    item {
+                        selectedSpace.location?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                        Text("${spaceItems.size} stavki", style = MaterialTheme.typography.titleMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { sortByDate = !sortByDate }) {
+                                Text(if (sortByDate) "Po datumu" else "Najnovije")
+                            }
+                            TextButton(onClick = { deletingSpaceId = selectedSpace.id }) {
+                                Text("Obriši prostor")
+                            }
+                        }
+                        if (spaceItems.isEmpty()) {
+                            Text("Ovaj prostor još nema stavki.", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    items(displayedItems, key = { "space-item-${it.id}" }) { item ->
+                        ItemCard(
+                            item = item,
+                            spaces = state.spaces,
+                            showCompletion = selectedSpace.template == "Shopping",
+                            isExpanded = expandedItemId == item.id,
+                            isEditing = editingItemId == item.id,
+                            editingText = if (editingItemId == item.id) editingText else item.text,
+                            onToggleExpanded = {
+                                expandedItemId = item.id.takeUnless { expandedItemId == it }
+                                editingItemId = null
+                            },
+                            onEdit = {
+                                editingItemId = item.id
+                                editingText = item.text
+                            },
+                            onTextChange = { editingText = it },
+                            onSave = {
+                                viewModel.updateItemText(item.id, editingText)
+                                editingItemId = null
+                            },
+                            onMove = { spaceId ->
+                                viewModel.moveItem(item.id, spaceId)
+                                expandedItemId = null
+                            },
                             onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
                             onSchedule = { scheduledAt -> viewModel.setItemScheduledAt(item.id, scheduledAt) },
                             onDelete = { deletingItemId = item.id },
@@ -325,6 +386,8 @@ fun App(viewModel: AppViewModel) {
                 confirmButton = {
                     TextButton(onClick = {
                         viewModel.deleteItem(itemId)
+                        if (expandedItemId == itemId) expandedItemId = null
+                        if (editingItemId == itemId) editingItemId = null
                         deletingItemId = null
                     }) { Text("Obriši") }
                 },
@@ -345,6 +408,9 @@ fun App(viewModel: AppViewModel) {
                 confirmButton = {
                     TextButton(onClick = {
                         viewModel.deleteSpace(spaceId)
+                        if (selectedSpaceId == spaceId) selectedSpaceId = null
+                        expandedItemId = null
+                        editingItemId = null
                         deletingSpaceId = null
                     }) { Text("Obriši") }
                 },
@@ -361,8 +427,10 @@ private fun ItemCard(
     item: Item,
     spaces: List<Space>,
     showCompletion: Boolean,
+    isExpanded: Boolean,
     isEditing: Boolean,
     editingText: String,
+    onToggleExpanded: () -> Unit,
     onEdit: () -> Unit,
     onTextChange: (String) -> Unit,
     onSave: () -> Unit,
@@ -386,7 +454,8 @@ private fun ItemCard(
         label = "item scale",
     )
     Card(
-        modifier = Modifier.graphicsLayer {
+        onClick = { if (!isEditing) onToggleExpanded() },
+        modifier = Modifier.animateContentSize().graphicsLayer {
             scaleX = cardScale
             scaleY = cardScale
         },
@@ -437,63 +506,65 @@ private fun ItemCard(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onEdit) { Text("Uredi") }
-                    TextButton(onClick = { menuExpanded = true }) { Text("Premjesti") }
-                    TextButton(onClick = onDelete) { Text("Obriši") }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = {
-                        val calendar = Calendar.getInstance().apply {
-                            item.scheduledAt?.let { timeInMillis = it }
-                        }
-                        DatePickerDialog(
-                            context,
-                            { _, year, month, day ->
-                                Calendar.getInstance().apply {
-                                    set(year, month, day, 0, 0, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                    onSchedule(timeInMillis)
-                                }
-                            },
-                            calendar.get(Calendar.YEAR),
-                            calendar.get(Calendar.MONTH),
-                            calendar.get(Calendar.DAY_OF_MONTH),
-                        ).show()
-                    }) { Text(if (item.scheduledAt == null) "Dodaj datum" else "Promijeni datum") }
-                    if (item.scheduledAt != null) {
-                        TextButton(onClick = { onSchedule(null) }) { Text("Ukloni datum") }
+                if (isExpanded) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = onEdit) { Text("Uredi") }
+                        TextButton(onClick = { menuExpanded = true }) { Text("Premjesti") }
+                        TextButton(onClick = onDelete) { Text("Obriši") }
                     }
-                }
-                if (item.scheduledAt != null) {
-                    TextButton(onClick = {
-                        val location = spaces.firstOrNull { it.id == item.spaceId }?.location
-                        try {
-                            context.startActivity(createCalendarInsertIntent(item, location))
-                        } catch (_: ActivityNotFoundException) {
-                            Toast.makeText(context, "Nije pronađena aplikacija kalendara.", Toast.LENGTH_SHORT).show()
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = {
+                            val calendar = Calendar.getInstance().apply {
+                                item.scheduledAt?.let { timeInMillis = it }
+                            }
+                            DatePickerDialog(
+                                context,
+                                { _, year, month, day ->
+                                    Calendar.getInstance().apply {
+                                        set(year, month, day, 0, 0, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                        onSchedule(timeInMillis)
+                                    }
+                                },
+                                calendar.get(Calendar.YEAR),
+                                calendar.get(Calendar.MONTH),
+                                calendar.get(Calendar.DAY_OF_MONTH),
+                            ).show()
+                        }) { Text(if (item.scheduledAt == null) "Dodaj datum" else "Promijeni datum") }
+                        if (item.scheduledAt != null) {
+                            TextButton(onClick = { onSchedule(null) }) { Text("Ukloni datum") }
                         }
-                    }) { Text("Dodaj u kalendar") }
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Nesortirano") },
-                        onClick = {
-                            onMove(null)
-                            menuExpanded = false
-                        },
-                    )
-                    spaces.forEach { space ->
+                    }
+                    if (item.scheduledAt != null) {
+                        TextButton(onClick = {
+                            val location = spaces.firstOrNull { it.id == item.spaceId }?.location
+                            try {
+                                context.startActivity(createCalendarInsertIntent(item, location))
+                            } catch (_: ActivityNotFoundException) {
+                                Toast.makeText(context, "Nije pronađena aplikacija kalendara.", Toast.LENGTH_SHORT).show()
+                            }
+                        }) { Text("Dodaj u kalendar") }
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
                         DropdownMenuItem(
-                            text = { Text(space.name) },
+                            text = { Text("Nesortirano") },
                             onClick = {
-                                onMove(space.id)
+                                onMove(null)
                                 menuExpanded = false
                             },
                         )
+                        spaces.forEach { space ->
+                            DropdownMenuItem(
+                                text = { Text(space.name) },
+                                onClick = {
+                                    onMove(space.id)
+                                    menuExpanded = false
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -590,8 +661,10 @@ private fun ItemCardPreview() {
             item = Item(id = 1, text = "Mlijeko"),
             spaces = listOf(Space(id = 2, name = "Voli", template = "Shopping")),
             showCompletion = true,
+            isExpanded = false,
             isEditing = false,
             editingText = "Mlijeko",
+            onToggleExpanded = {},
             onEdit = {},
             onTextChange = {},
             onSave = {},
