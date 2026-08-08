@@ -78,4 +78,15 @@ class LifeSpacesRepositoryTest {
         repository.updateItemText(itemId, "   ")
         assertEquals("Updated", repository.items.first().single().text)
     }
+
+    @Test
+    fun scheduledDate_canBeSetAndCleared() = runTest {
+        val itemId = repository.createItem("Birthday")
+
+        repository.setItemScheduledAt(itemId, 1_700_000_000_000)
+        assertEquals(1_700_000_000_000, repository.items.first().single().scheduledAt)
+
+        repository.setItemScheduledAt(itemId, null)
+        assertEquals(null, repository.items.first().single().scheduledAt)
+    }
 }

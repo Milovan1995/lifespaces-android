@@ -37,6 +37,10 @@ class LifeSpacesRepository(
         itemDao.updateCompleted(itemId, completed, System.currentTimeMillis())
     }
 
+    suspend fun setItemScheduledAt(itemId: Long, scheduledAt: Long?) {
+        itemDao.updateScheduledAt(itemId, scheduledAt, System.currentTimeMillis())
+    }
+
     suspend fun deleteItem(itemId: Long) {
         val item = itemDao.getById(itemId) ?: return
         itemDao.delete(item)

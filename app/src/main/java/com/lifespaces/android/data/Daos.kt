@@ -54,6 +54,9 @@ interface ItemDao {
     @Query("UPDATE items SET completed = :completed, updatedAt = :updatedAt WHERE id = :itemId")
     suspend fun updateCompleted(itemId: Long, completed: Boolean, updatedAt: Long)
 
+    @Query("UPDATE items SET scheduledAt = :scheduledAt, updatedAt = :updatedAt WHERE id = :itemId")
+    suspend fun updateScheduledAt(itemId: Long, scheduledAt: Long?, updatedAt: Long)
+
     @Query("SELECT * FROM items WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): Item?
 }

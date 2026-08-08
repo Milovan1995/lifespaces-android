@@ -56,6 +56,10 @@ class AppViewModel(private val repository: LifeSpacesRepository) : ViewModel() {
         viewModelScope.launch { repository.setItemCompleted(itemId, completed) }
     }
 
+    fun setItemScheduledAt(itemId: Long, scheduledAt: Long?) {
+        viewModelScope.launch { repository.setItemScheduledAt(itemId, scheduledAt) }
+    }
+
     fun deleteItem(itemId: Long) {
         viewModelScope.launch { repository.deleteItem(itemId) }
     }

@@ -1,5 +1,6 @@
 package com.lifespaces.android.ui
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,11 +34,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lifespaces.android.data.Item
 import com.lifespaces.android.data.Space
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun App(viewModel: AppViewModel) {
@@ -121,6 +127,7 @@ fun App(viewModel: AppViewModel) {
                         },
                         onMove = { spaceId -> viewModel.moveItem(item.id, spaceId) },
                         onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
+                        onSchedule = { scheduledAt -> viewModel.setItemScheduledAt(item.id, scheduledAt) },
                         onDelete = { deletingItemId = item.id },
                     )
                 }
@@ -224,6 +231,7 @@ fun App(viewModel: AppViewModel) {
                             },
                             onMove = { spaceId -> viewModel.moveItem(item.id, spaceId) },
                             onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
+                            onSchedule = { scheduledAt -> viewModel.setItemScheduledAt(item.id, scheduledAt) },
                             onDelete = { deletingItemId = item.id },
                         )
                     }
@@ -282,9 +290,11 @@ private fun ItemCard(
     onSave: () -> Unit,
     onMove: (Long?) -> Unit,
     onCompletedChange: (Boolean) -> Unit,
+    onSchedule: (Long?) -> Unit,
     onDelete: () -> Unit,
 ) {
     var menuExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
+    val context = LocalContext.current
     Card {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -323,10 +333,39 @@ private fun ItemCard(
                         },
                     )
                 }
+                item.scheduledAt?.let {
+                    Text(
+                        "Datum: ${SimpleDateFormat("d. MMM yyyy.", Locale.getDefault()).format(Date(it))}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = onEdit) { Text("Uredi") }
                     TextButton(onClick = { menuExpanded = true }) { Text("Premjesti") }
                     TextButton(onClick = onDelete) { Text("Obriši") }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        val calendar = Calendar.getInstance().apply {
+                            item.scheduledAt?.let { timeInMillis = it }
+                        }
+                        DatePickerDialog(
+                            context,
+                            { _, year, month, day ->
+                                Calendar.getInstance().apply {
+                                    set(year, month, day, 0, 0, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                    onSchedule(timeInMillis)
+                                }
+                            },
+                            calendar.get(Calendar.YEAR),
+                            calendar.get(Calendar.MONTH),
+                            calendar.get(Calendar.DAY_OF_MONTH),
+                        ).show()
+                    }) { Text(if (item.scheduledAt == null) "Dodaj datum" else "Promijeni datum") }
+                    if (item.scheduledAt != null) {
+                        TextButton(onClick = { onSchedule(null) }) { Text("Ukloni datum") }
+                    }
                 }
                 DropdownMenu(
                     expanded = menuExpanded,
@@ -369,6 +408,7 @@ private fun ItemCardPreview() {
             onSave = {},
             onMove = {},
             onCompletedChange = {},
+            onSchedule = {},
             onDelete = {},
         )
     }
