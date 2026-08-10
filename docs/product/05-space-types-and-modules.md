@@ -22,6 +22,12 @@ Capabilities can be removed. Removing one permanently deletes its associated
 data after explicit user confirmation. The initial product keeps no change
 history or restoration log.
 
+The **links** capability offers an optional per-item label and keeps that label,
+URLs, descriptions, and notes in the existing item text. A bare safe HTTP/HTTPS
+URL, or one in the last line after a label or description, can be opened or
+copied. No preview or network metadata is stored. Removing the capability keeps
+item text.
+
 Calendar visibility is global: any item with a date appears in the calendar,
 whether or not its space has other capabilities.
 
@@ -30,6 +36,7 @@ whether or not its space has other capabilities.
 | Shopping | Completion state, text notes, optional location |
 | Maintenance | Relevant dates, notes, optional cost information |
 | Event | Date and time, location, notes |
+| Links | Text notes and safe HTTP/HTTPS links |
 | General | Notes and optional date information |
 
 ## Custom spaces

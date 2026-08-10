@@ -8,11 +8,17 @@ object SpaceCapabilities {
     const val COMPLETION = "COMPLETION"
     const val DATE = "DATE"
     const val LOCATION = "LOCATION"
+    const val LINKS = "LINKS"
 
     val shopping = setOf(TEXT, COMPLETION, DATE, LOCATION)
     val general = setOf(TEXT, DATE)
+    val links = setOf(TEXT, LINKS)
 
-    fun defaults(template: String): Set<String> = if (template == "Shopping") shopping else general
+    fun defaults(template: String): Set<String> = when (template) {
+        "Shopping" -> shopping
+        "Links" -> links
+        else -> general
+    }
 }
 
 class LifeSpacesRepository(

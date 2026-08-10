@@ -3,7 +3,10 @@ package com.lifespaces.android.ui
 import android.app.DatePickerDialog
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
+import android.net.Uri
 import android.provider.CalendarContract
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
@@ -107,6 +110,7 @@ fun App(viewModel: AppViewModel) {
     var spaceTemplate by rememberSaveable { mutableStateOf("Shopping") }
     var templateMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var editingItemId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editingItemLabel by rememberSaveable { mutableStateOf<String?>(null) }
     var editingText by rememberSaveable { mutableStateOf("") }
     var deletingItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -116,11 +120,13 @@ fun App(viewModel: AppViewModel) {
     var expandedItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var spaceMenuId by rememberSaveable { mutableStateOf<Long?>(null) }
     var addingItemSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var newSpaceItemLabel by rememberSaveable { mutableStateOf("") }
     var newSpaceItemText by rememberSaveable { mutableStateOf("") }
     var showSpaceCreator by rememberSaveable { mutableStateOf(false) }
     var createCompletion by rememberSaveable { mutableStateOf(true) }
     var createDate by rememberSaveable { mutableStateOf(true) }
     var createLocation by rememberSaveable { mutableStateOf(true) }
+    var createLinks by rememberSaveable { mutableStateOf(false) }
     var createSpaceColor by rememberSaveable { mutableStateOf<Long?>(null) }
     var editingSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
     var editingSpaceName by rememberSaveable { mutableStateOf("") }
@@ -128,6 +134,7 @@ fun App(viewModel: AppViewModel) {
     var editingSpaceCompletion by rememberSaveable { mutableStateOf(false) }
     var editingSpaceDate by rememberSaveable { mutableStateOf(false) }
     var editingSpaceLocationEnabled by rememberSaveable { mutableStateOf(false) }
+    var editingSpaceLinks by rememberSaveable { mutableStateOf(false) }
     var editingSpaceColor by rememberSaveable { mutableStateOf<Long?>(null) }
     var confirmingSpaceEditId by rememberSaveable { mutableStateOf<Long?>(null) }
     val systemDarkTheme = isSystemInDarkTheme()
@@ -284,15 +291,22 @@ fun App(viewModel: AppViewModel) {
                                     showCompletion = false,
                                     showDateActions = true,
                                     isEditing = editingItemId == item.id,
+                                    editingLabel = if (editingItemId == item.id) editingItemLabel else null,
                                     editingText = if (editingItemId == item.id) editingText else item.text,
                                     onToggleExpanded = {
                                         expandedItemId = item.id
                                         editingItemId = null
+                                        editingItemLabel = null
                                     },
+                                    onLabelChange = { editingItemLabel = it },
                                     onTextChange = { editingText = it },
                                     onSave = {
-                                        viewModel.updateItemText(item.id, editingText)
+                                        viewModel.updateItemText(
+                                            item.id,
+                                            editingItemLabel?.let { labelledItemText(it, editingText) } ?: editingText,
+                                        )
                                         editingItemId = null
+                                        editingItemLabel = null
                                     },
                                     onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
                                 )
@@ -317,6 +331,7 @@ fun App(viewModel: AppViewModel) {
                                 createCompletion = true
                                 createDate = true
                                 createLocation = true
+                                createLinks = false
                                 createSpaceColor = null
                                 editingSpaceId = null
                                 expandedItemId = null
@@ -341,6 +356,7 @@ fun App(viewModel: AppViewModel) {
                         val hasCompletion = SpaceCapabilities.COMPLETION in capabilities
                         val hasDate = SpaceCapabilities.DATE in capabilities
                         val hasLocation = SpaceCapabilities.LOCATION in capabilities
+                        val hasLinks = SpaceCapabilities.LINKS in capabilities
                         val spaceItems = state.items.filter { it.spaceId == space.id }
                         val displayedItems = if (sortByDate && hasDate) {
                             spaceItems.sortedWith(compareBy<Item> { it.scheduledAt == null }.thenBy { it.scheduledAt ?: Long.MAX_VALUE })
@@ -382,6 +398,7 @@ fun App(viewModel: AppViewModel) {
                                             editingSpaceId = null
                                             if (addingItemSpaceId == space.id) {
                                                 addingItemSpaceId = null
+                                                newSpaceItemLabel = ""
                                                 newSpaceItemText = ""
                                             }
                                             spaceMenuId = null
@@ -408,6 +425,7 @@ fun App(viewModel: AppViewModel) {
                                     IconButton(onClick = {
                                         expandedSpaceId = space.id
                                         addingItemSpaceId = space.id
+                                        newSpaceItemLabel = ""
                                         newSpaceItemText = ""
                                         editingSpaceId = null
                                         expandedItemId = null
@@ -451,6 +469,7 @@ fun App(viewModel: AppViewModel) {
                                                     editingSpaceCompletion = hasCompletion
                                                     editingSpaceDate = hasDate
                                                     editingSpaceLocationEnabled = hasLocation
+                                                    editingSpaceLinks = hasLinks
                                                     editingSpaceColor = space.color
                                                     spaceMenuId = null
                                                 },
@@ -481,31 +500,61 @@ fun App(viewModel: AppViewModel) {
                                                 modifier = Modifier.padding(16.dp),
                                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                                             ) {
+                                                val saveItem = {
+                                                    viewModel.addItemToSpace(
+                                                        space.id,
+                                                        if (hasLinks) {
+                                                            labelledItemText(newSpaceItemLabel, newSpaceItemText)
+                                                        } else {
+                                                            newSpaceItemText
+                                                        },
+                                                    )
+                                                    newSpaceItemLabel = ""
+                                                    newSpaceItemText = ""
+                                                    addingItemSpaceId = null
+                                                }
+                                                if (hasLinks) {
+                                                    OutlinedTextField(
+                                                        value = newSpaceItemLabel,
+                                                        onValueChange = { newSpaceItemLabel = it },
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        label = { Text("Labela (opciono)") },
+                                                        singleLine = true,
+                                                    )
+                                                }
                                                 OutlinedTextField(
                                                     value = newSpaceItemText,
                                                     onValueChange = { newSpaceItemText = it },
                                                     modifier = Modifier.fillMaxWidth(),
-                                                    label = { Text("Nova stavka u ${space.name}") },
-                                                    singleLine = true,
-                                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                                    label = {
+                                                        Text(
+                                                            if (hasLinks) "Novi link ili bilješka" else "Nova stavka u ${space.name}",
+                                                        )
+                                                    },
+                                                    singleLine = !hasLinks,
+                                                    minLines = if (hasLinks) 2 else 1,
+                                                    keyboardOptions = KeyboardOptions(
+                                                        imeAction = if (hasLinks) ImeAction.Default else ImeAction.Done,
+                                                    ),
                                                     keyboardActions = KeyboardActions(onDone = {
                                                         if (newSpaceItemText.isNotBlank()) {
-                                                            viewModel.addItemToSpace(space.id, newSpaceItemText)
-                                                            newSpaceItemText = ""
-                                                            addingItemSpaceId = null
+                                                            saveItem()
                                                         }
                                                     }),
                                                 )
+                                                if (hasLinks) {
+                                                    Text(
+                                                        "Unesi HTTP/HTTPS link ili bilješku; labela nije obavezna.",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                    )
+                                                }
                                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                     Button(
-                                                        onClick = {
-                                                            viewModel.addItemToSpace(space.id, newSpaceItemText)
-                                                            newSpaceItemText = ""
-                                                            addingItemSpaceId = null
-                                                        },
+                                                        onClick = saveItem,
                                                         enabled = newSpaceItemText.isNotBlank(),
                                                     ) { Text("Dodaj stavku") }
                                                     TextButton(onClick = {
+                                                        newSpaceItemLabel = ""
                                                         newSpaceItemText = ""
                                                         addingItemSpaceId = null
                                                     }) { Text("Otkaži") }
@@ -530,15 +579,22 @@ fun App(viewModel: AppViewModel) {
                                     showCompletion = hasCompletion,
                                     showDateActions = hasDate || item.scheduledAt != null,
                                     isEditing = editingItemId == item.id,
+                                    editingLabel = if (editingItemId == item.id) editingItemLabel else null,
                                     editingText = if (editingItemId == item.id) editingText else item.text,
                                     onToggleExpanded = {
                                         expandedItemId = item.id
                                         editingItemId = null
+                                        editingItemLabel = null
                                     },
+                                    onLabelChange = { editingItemLabel = it },
                                     onTextChange = { editingText = it },
                                     onSave = {
-                                        viewModel.updateItemText(item.id, editingText)
+                                        viewModel.updateItemText(
+                                            item.id,
+                                            editingItemLabel?.let { labelledItemText(it, editingText) } ?: editingText,
+                                        )
                                         editingItemId = null
+                                        editingItemLabel = null
                                     },
                                     onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
                                     )
@@ -577,14 +633,15 @@ fun App(viewModel: AppViewModel) {
                             expanded = templateMenuExpanded,
                             onDismissRequest = { templateMenuExpanded = false },
                         ) {
-                            listOf("Shopping", "General").forEach { template ->
+                            listOf("Shopping", "General", "Links").forEach { template ->
                                 DropdownMenuItem(
                                     text = { Text(template) },
                                     onClick = {
                                         spaceTemplate = template
                                         createCompletion = template == "Shopping"
-                                        createDate = true
+                                        createDate = template != "Links"
                                         createLocation = template == "Shopping"
+                                        createLinks = template == "Links"
                                         templateMenuExpanded = false
                                     },
                                 )
@@ -598,6 +655,7 @@ fun App(viewModel: AppViewModel) {
                     CapabilityCheckbox("Završavanje stavki", createCompletion) { createCompletion = it }
                     CapabilityCheckbox("Datum", createDate) { createDate = it }
                     CapabilityCheckbox("Lokacija", createLocation) { createLocation = it }
+                    CapabilityCheckbox("Linkovi", createLinks) { createLinks = it }
                     if (createLocation) {
                         OutlinedTextField(
                             value = spaceLocation,
@@ -634,7 +692,7 @@ fun App(viewModel: AppViewModel) {
                                 spaceName,
                                 spaceTemplate,
                                 spaceLocation,
-                                selectedCapabilities(createCompletion, createDate, createLocation),
+                                selectedCapabilities(createCompletion, createDate, createLocation, createLinks),
                                 createSpaceColor,
                             )
                             showSpaceCreator = false
@@ -655,6 +713,7 @@ fun App(viewModel: AppViewModel) {
                     val hasCompletion = SpaceCapabilities.COMPLETION in capabilities
                     val hasDate = SpaceCapabilities.DATE in capabilities
                     val hasLocation = SpaceCapabilities.LOCATION in capabilities
+                    val hasLinks = SpaceCapabilities.LINKS in capabilities
                     val spaceItems = state.items.filter { it.spaceId == spaceId }
                     ModalBottomSheet(onDismissRequest = { editingSpaceId = null }) {
                         Column(
@@ -679,6 +738,7 @@ fun App(viewModel: AppViewModel) {
                                 "Lokacija",
                                 editingSpaceLocationEnabled,
                             ) { editingSpaceLocationEnabled = it }
+                            CapabilityCheckbox("Linkovi", editingSpaceLinks) { editingSpaceLinks = it }
                             if (editingSpaceLocationEnabled) {
                                 OutlinedTextField(
                                     value = editingSpaceLocation,
@@ -710,6 +770,7 @@ fun App(viewModel: AppViewModel) {
                                                 editingSpaceCompletion,
                                                 editingSpaceDate,
                                                 editingSpaceLocationEnabled,
+                                                editingSpaceLinks,
                                             ),
                                         )
                                         editingSpaceId = null
@@ -739,7 +800,9 @@ fun App(viewModel: AppViewModel) {
                 onEdit = {
                     expandedItemId = null
                     editingItemId = selectedItem.id
-                    editingText = selectedItem.text
+                    val (label, content) = linkItemParts(selectedItem.text)
+                    editingItemLabel = label
+                    editingText = content
                 },
                 onMove = { destination ->
                     viewModel.moveItem(selectedItem.id, destination)
@@ -831,6 +894,7 @@ fun App(viewModel: AppViewModel) {
                                 editingSpaceCompletion,
                                 editingSpaceDate,
                                 editingSpaceLocationEnabled,
+                                editingSpaceLinks,
                             ),
                             clearCompleted = !editingSpaceCompletion && SpaceCapabilities.COMPLETION in capabilities,
                             clearScheduledAt = !editingSpaceDate && SpaceCapabilities.DATE in capabilities,
@@ -877,12 +941,18 @@ private fun CapabilityCheckbox(label: String, checked: Boolean, onCheckedChange:
     }
 }
 
-private fun selectedCapabilities(completion: Boolean, date: Boolean, location: Boolean): Set<String> =
+private fun selectedCapabilities(
+    completion: Boolean,
+    date: Boolean,
+    location: Boolean,
+    links: Boolean,
+): Set<String> =
     setOfNotNull(
         SpaceCapabilities.TEXT,
         SpaceCapabilities.COMPLETION.takeIf { completion },
         SpaceCapabilities.DATE.takeIf { date },
         SpaceCapabilities.LOCATION.takeIf { location },
+        SpaceCapabilities.LINKS.takeIf { links },
     )
 
 private val SpaceColorOptions = listOf(
@@ -938,8 +1008,10 @@ private fun ItemCard(
     showCompletion: Boolean,
     showDateActions: Boolean,
     isEditing: Boolean,
+    editingLabel: String?,
     editingText: String,
     onToggleExpanded: () -> Unit,
+    onLabelChange: (String) -> Unit,
     onTextChange: (String) -> Unit,
     onSave: () -> Unit,
     onCompletedChange: (Boolean) -> Unit,
@@ -982,12 +1054,24 @@ private fun ItemCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (isEditing) {
+                editingLabel?.let { label ->
+                    OutlinedTextField(
+                        value = label,
+                        onValueChange = onLabelChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Labela (opciono)") },
+                        singleLine = true,
+                    )
+                }
                 OutlinedTextField(
                     value = editingText,
                     onValueChange = onTextChange,
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    singleLine = editingLabel == null,
+                    label = editingLabel?.let { { Text("Link") } },
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = if (editingLabel == null) ImeAction.Done else ImeAction.Default,
+                    ),
                     keyboardActions = KeyboardActions(onDone = { onSave() }),
                 )
                 Button(
@@ -1039,6 +1123,7 @@ private fun ItemActionsSheet(
 ) {
     val context = LocalContext.current
     var moveMenuExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
+    val linkIntent = createWebLinkIntent(item.text)
     val showDatePicker = {
         val calendar = Calendar.getInstance().apply {
             item.scheduledAt?.let { timeInMillis = it }
@@ -1073,6 +1158,26 @@ private fun ItemActionsSheet(
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SheetAction("Uredi", onClick = onEdit)
+            linkIntent?.let { intent ->
+                SheetAction("Otvori link") {
+                    onDismiss()
+                    try {
+                        context.startActivity(intent)
+                    } catch (_: ActivityNotFoundException) {
+                        Toast.makeText(
+                            context,
+                            "Nije pronađena aplikacija koja može otvoriti link.",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+                SheetAction("Kopiraj link") {
+                    context.getSystemService(ClipboardManager::class.java).setPrimaryClip(
+                        ClipData.newPlainText("Link", intent.data.toString()),
+                    )
+                    Toast.makeText(context, "Link je kopiran.", Toast.LENGTH_SHORT).show()
+                }
+            }
             Box {
                 SheetAction("Premjesti") { moveMenuExpanded = true }
                 DropdownMenu(
@@ -1150,6 +1255,30 @@ internal fun createCalendarInsertIntent(item: Item, location: String?): Intent {
     }
 }
 
+internal fun safeWebUri(text: String): Uri? {
+    val value = text.trim().lineSequence().lastOrNull()?.trim().orEmpty()
+    if (value.isEmpty() || value.any(Char::isWhitespace)) return null
+    val uri = Uri.parse(value)
+    return uri.takeIf {
+        it.scheme?.lowercase(Locale.ROOT) in setOf("http", "https") &&
+            !it.host.isNullOrBlank() &&
+            it.userInfo == null
+    }
+}
+
+internal fun labelledItemText(label: String, content: String): String =
+    label.trim().takeIf(String::isNotEmpty)?.let { "$it\n${content.trim()}" } ?: content.trim()
+
+internal fun linkItemParts(text: String): Pair<String?, String> {
+    val value = text.trim()
+    val url = safeWebUri(value) ?: return null to value
+    val lines = value.lines()
+    return lines.dropLast(1).joinToString("\n").trim() to url.toString()
+}
+
+internal fun createWebLinkIntent(text: String): Intent? =
+    safeWebUri(text)?.let { Intent(Intent.ACTION_VIEW, it) }
+
 private val LifeSpacesCardShape = RoundedCornerShape(24.dp)
 
 private val LifeSpacesLightColors = lightColorScheme(
@@ -1225,8 +1354,10 @@ private fun ItemCardPreview() {
             showCompletion = true,
             showDateActions = true,
             isEditing = false,
+            editingLabel = null,
             editingText = "Mlijeko",
             onToggleExpanded = {},
+            onLabelChange = {},
             onTextChange = {},
             onSave = {},
             onCompletedChange = {},

@@ -95,11 +95,13 @@ class LifeSpacesRepositoryTest {
     fun homeFeed_derivesDefaultsForLegacySpaces() = runTest {
         val shoppingId = db.spaceDao().insert(Space(name = "Shop", template = "Shopping"))
         val generalId = db.spaceDao().insert(Space(name = "Home", template = "General", location = "Kitchen"))
+        val linksId = db.spaceDao().insert(Space(name = "Reading", template = "Links"))
 
         val capabilities = repository.homeFeed.first().capabilities
 
         assertEquals(SpaceCapabilities.shopping, capabilities[shoppingId])
         assertEquals(SpaceCapabilities.general + SpaceCapabilities.LOCATION, capabilities[generalId])
+        assertEquals(SpaceCapabilities.links, capabilities[linksId])
     }
 
     @Test
