@@ -181,4 +181,52 @@ class LifeSpacesRepositoryTest {
             }.exceptionOrNull() is IllegalArgumentException,
         )
     }
+
+    @Test
+    fun defaultShiftTypesAreSeededOnceWithMondayDailyOverride() = runTest {
+        repository.ensureDefaultShiftTypes()
+        repository.ensureDefaultShiftTypes()
+
+        val calendar = repository.calendarFeed.first()
+        val daily = calendar.shiftTypes.single { it.name == "Dnevna" }
+        assertEquals(3, calendar.shiftTypes.size)
+        assertEquals(1, calendar.overrides.size)
+        assertEquals(1, calendar.overrides.single().weekday)
+        assertEquals(daily.id, calendar.overrides.single().shiftTypeId)
+        assertTrue(daily.color ushr 32 != 0L)
+        assertEquals(12 * 60, calendar.shiftTypes.single { it.name == "Jutarnja" }.defaultEndMinute)
+    }
+
+    @Test
+    fun shiftDayCanBeSavedUpdatedAndCleared() = runTest {
+        repository.ensureDefaultShiftTypes()
+        val dailyId = repository.calendarFeed.first().shiftTypes.single { it.name == "Dnevna" }.id
+
+        repository.saveShiftDay("2026-08-10", dailyId, "  Smjena u kancelariji  ")
+        repository.saveShiftDay("2026-08-10", null, "  Slobodan dan  ")
+        val day = repository.calendarFeed.first().shiftDays.single()
+        assertNull(day.shiftTypeId)
+        assertEquals("Slobodan dan", day.note)
+
+        repository.clearShiftDay("2026-08-10")
+        assertTrue(repository.calendarFeed.first().shiftDays.isEmpty())
+    }
+
+    @Test
+    fun updatingExistingWeekdayOverridesReplacesThem() = runTest {
+        repository.ensureDefaultShiftTypes()
+        val daily = repository.calendarFeed.first().shiftTypes.single { it.name == "Dnevna" }
+
+        repository.updateShiftType(
+            daily,
+            listOf(
+                ShiftWeekdayOverride(daily.id, weekday = 1, startMinute = 8 * 60, endMinute = 16 * 60, alarmMinute = 6 * 60),
+                ShiftWeekdayOverride(daily.id, weekday = 2, startMinute = 10 * 60, endMinute = 18 * 60, alarmMinute = 8 * 60),
+            ),
+        )
+
+        val saved = repository.calendarFeed.first().overrides.filter { it.shiftTypeId == daily.id }
+        assertEquals(2, saved.size)
+        assertEquals(8 * 60, saved.single { it.weekday == 1 }.startMinute)
+    }
 }

@@ -3,6 +3,7 @@ package com.lifespaces.android.data
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
@@ -117,14 +118,44 @@ interface ItemDao {
 
 @Dao
 interface ShiftDao {
+    @Query("SELECT * FROM shift_types ORDER BY id ASC")
+    fun observeTypes(): Flow<List<ShiftType>>
+
+    @Query("SELECT * FROM shift_types ORDER BY id ASC")
+    suspend fun getTypes(): List<ShiftType>
+
+    @Query("SELECT * FROM shift_weekday_overrides")
+    fun observeOverrides(): Flow<List<ShiftWeekdayOverride>>
+
+    @Query("SELECT * FROM shift_days")
+    fun observeDays(): Flow<List<ShiftDay>>
+
     @Insert
     suspend fun insertType(shiftType: ShiftType): Long
 
-    @Insert
+    @Update
+    suspend fun updateType(shiftType: ShiftType)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOverride(override: ShiftWeekdayOverride)
+
+    @Query("DELETE FROM shift_weekday_overrides WHERE shiftTypeId = :shiftTypeId AND weekday = :weekday")
+    suspend fun deleteOverride(shiftTypeId: Long, weekday: Int)
 
     @Insert
     suspend fun insertDay(day: ShiftDay): Long
+
+    @Update
+    suspend fun updateDay(day: ShiftDay)
+
+    @Query("SELECT * FROM shift_days WHERE localDate = :localDate LIMIT 1")
+    suspend fun getDayByDate(localDate: String): ShiftDay?
+
+    @Query("DELETE FROM shift_days WHERE localDate = :localDate")
+    suspend fun deleteDayByDate(localDate: String)
+
+    @Query("SELECT COUNT(*) FROM shift_types")
+    suspend fun typeCount(): Int
 
     @Query("SELECT * FROM shift_days WHERE id = :id LIMIT 1")
     suspend fun getDayById(id: Long): ShiftDay?

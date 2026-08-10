@@ -5,6 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.lifespaces.android.data.HomeFeed
 import com.lifespaces.android.data.LifeSpacesRepository
+import com.lifespaces.android.data.CalendarFeed
+import com.lifespaces.android.data.ShiftDay
+import com.lifespaces.android.data.ShiftType
+import com.lifespaces.android.data.ShiftWeekdayOverride
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +25,11 @@ class AppViewModel(private val repository: LifeSpacesRepository) : ViewModel() {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = HomeFeed(emptyList(), emptyList()),
+    )
+    val calendar: StateFlow<CalendarFeed> = repository.calendarFeed.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = CalendarFeed(),
     )
 
     fun onCaptureTextChange(value: String) {
@@ -108,6 +117,22 @@ class AppViewModel(private val repository: LifeSpacesRepository) : ViewModel() {
 
     fun deleteSpace(spaceId: Long) {
         viewModelScope.launch { repository.deleteSpace(spaceId) }
+    }
+
+    fun ensureDefaultShiftTypes() {
+        viewModelScope.launch { repository.ensureDefaultShiftTypes() }
+    }
+
+    fun updateShiftType(shiftType: ShiftType, overrides: List<ShiftWeekdayOverride>) {
+        viewModelScope.launch { repository.updateShiftType(shiftType, overrides) }
+    }
+
+    fun saveShiftDay(localDate: String, shiftTypeId: Long?, note: String?) {
+        viewModelScope.launch { repository.saveShiftDay(localDate, shiftTypeId, note) }
+    }
+
+    fun clearShiftDay(localDate: String) {
+        viewModelScope.launch { repository.clearShiftDay(localDate) }
     }
 
     companion object {

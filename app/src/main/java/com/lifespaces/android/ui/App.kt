@@ -106,6 +106,7 @@ import java.time.LocalDate
 fun App(viewModel: AppViewModel) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
+    val calendar by viewModel.calendar.collectAsState()
     val captureText by viewModel.captureText.collectAsState()
     var spaceName by rememberSaveable { mutableStateOf("") }
     var spaceLocation by rememberSaveable { mutableStateOf("") }
@@ -179,6 +180,7 @@ fun App(viewModel: AppViewModel) {
                                 val today = LocalDate.now()
                                 weekStartEpochDay = mondayOf(today).toEpochDay()
                                 selectedDateEpochDay = today.toEpochDay()
+                                viewModel.ensureDefaultShiftTypes()
                             }
                         }) {
                             Icon(
@@ -215,6 +217,9 @@ fun App(viewModel: AppViewModel) {
                     spaces = state.spaces,
                     weekStart = LocalDate.ofEpochDay(weekStartEpochDay),
                     selectedDate = LocalDate.ofEpochDay(selectedDateEpochDay),
+                    shiftTypes = calendar.shiftTypes,
+                    overrides = calendar.overrides,
+                    shiftDays = calendar.shiftDays,
                     onPreviousWeek = { weekStartEpochDay = moveCalendarWeek(LocalDate.ofEpochDay(weekStartEpochDay), -1).toEpochDay() },
                     onNextWeek = { weekStartEpochDay = moveCalendarWeek(LocalDate.ofEpochDay(weekStartEpochDay), 1).toEpochDay() },
                     onToday = {
@@ -224,6 +229,8 @@ fun App(viewModel: AppViewModel) {
                     },
                     onDateSelected = { selectedDateEpochDay = it.toEpochDay() },
                     onItemSelected = { expandedItemId = it.id },
+                    onSaveShiftDay = viewModel::saveShiftDay,
+                    onClearShiftDay = viewModel::clearShiftDay,
                 )
             } else {
             LazyColumn(
