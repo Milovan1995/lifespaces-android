@@ -7,6 +7,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,7 +26,7 @@ class LifeSpacesRepositoryTest {
             ApplicationProvider.getApplicationContext(),
             AppDatabase::class.java,
         ).allowMainThreadQueries().build()
-        repository = LifeSpacesRepository(db.spaceDao(), db.itemDao(), db.reminderDao())
+        repository = LifeSpacesRepository(db.spaceDao(), db.itemDao(), db.shiftDao(), db.alarmDao())
     }
 
     @After
@@ -151,5 +152,33 @@ class LifeSpacesRepositoryTest {
 
         repository.updateSpace(spaceId, "Home", null, null, SpaceCapabilities.general)
         assertNull(repository.spaces.first().single().color)
+    }
+
+    @Test
+    fun alarm_requiresExactlyOneExistingOwner() = runTest {
+        val itemId = repository.createItem("Appointment")
+        val dayId = db.shiftDao().insertDay(ShiftDay(localDate = "2026-08-11"))
+
+        repository.insertAlarm(Alarm(itemId = itemId, localDate = "2026-08-11", minuteOfDay = 480))
+        repository.insertAlarm(Alarm(shiftDayId = dayId, localDate = "2026-08-11", minuteOfDay = 540))
+
+        assertEquals(2, repository.alarms.first().size)
+        assertTrue(
+            runCatching {
+                repository.insertAlarm(Alarm(localDate = "2026-08-11", minuteOfDay = 600))
+            }.exceptionOrNull() is IllegalArgumentException,
+        )
+        assertTrue(
+            runCatching {
+                repository.insertAlarm(
+                    Alarm(itemId = itemId, shiftDayId = dayId, localDate = "2026-08-11", minuteOfDay = 600),
+                )
+            }.exceptionOrNull() is IllegalArgumentException,
+        )
+        assertTrue(
+            runCatching {
+                repository.insertAlarm(Alarm(itemId = 999, localDate = "2026-08-11", minuteOfDay = 600))
+            }.exceptionOrNull() is IllegalArgumentException,
+        )
     }
 }

@@ -116,13 +116,28 @@ interface ItemDao {
 }
 
 @Dao
-interface ReminderDao {
-    @Query("SELECT * FROM reminders ORDER BY scheduledAt ASC")
-    fun observeReminders(): Flow<List<Reminder>>
+interface ShiftDao {
+    @Insert
+    suspend fun insertType(shiftType: ShiftType): Long
 
     @Insert
-    suspend fun insert(reminder: Reminder): Long
+    suspend fun insertOverride(override: ShiftWeekdayOverride)
+
+    @Insert
+    suspend fun insertDay(day: ShiftDay): Long
+
+    @Query("SELECT * FROM shift_days WHERE id = :id LIMIT 1")
+    suspend fun getDayById(id: Long): ShiftDay?
+}
+
+@Dao
+interface AlarmDao {
+    @Query("SELECT * FROM alarms ORDER BY localDate ASC, minuteOfDay ASC, id ASC")
+    fun observeAlarms(): Flow<List<Alarm>>
+
+    @Insert
+    suspend fun insert(alarm: Alarm): Long
 
     @Delete
-    suspend fun delete(reminder: Reminder)
+    suspend fun delete(alarm: Alarm)
 }

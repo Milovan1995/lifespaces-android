@@ -1,6 +1,8 @@
 package com.lifespaces.android.data
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "spaces")
@@ -33,10 +35,66 @@ data class Item(
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
-@Entity(tableName = "reminders")
-data class Reminder(
+@Entity(tableName = "shift_types")
+data class ShiftType(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val itemId: Long,
-    val scheduledAt: Long,
-    val enabled: Boolean = true,
+    val name: String,
+    val color: Long,
+    val defaultStartMinute: Int,
+    val defaultEndMinute: Int,
+    val defaultAlarmMinute: Int,
+)
+
+@Entity(
+    tableName = "shift_weekday_overrides",
+    primaryKeys = ["shiftTypeId", "weekday"],
+    foreignKeys = [
+        ForeignKey(
+            entity = ShiftType::class,
+            parentColumns = ["id"],
+            childColumns = ["shiftTypeId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("shiftTypeId")],
+)
+data class ShiftWeekdayOverride(
+    val shiftTypeId: Long,
+    val weekday: Int,
+    val startMinute: Int? = null,
+    val endMinute: Int? = null,
+    val alarmMinute: Int? = null,
+)
+
+@Entity(
+    tableName = "shift_days",
+    foreignKeys = [
+        ForeignKey(
+            entity = ShiftType::class,
+            parentColumns = ["id"],
+            childColumns = ["shiftTypeId"],
+        ),
+    ],
+    indices = [Index(value = ["localDate"], unique = true), Index("shiftTypeId")],
+)
+data class ShiftDay(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val localDate: String,
+    val shiftTypeId: Long? = null,
+    val note: String? = null,
+)
+
+@Entity(
+    tableName = "alarms",
+    indices = [Index("itemId"), Index("shiftDayId")],
+)
+data class Alarm(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val itemId: Long? = null,
+    val shiftDayId: Long? = null,
+    val localDate: String,
+    val minuteOfDay: Int,
+    val description: String? = null,
+    val snoozeMinutes: Int = 10,
+    val completed: Boolean = false,
 )

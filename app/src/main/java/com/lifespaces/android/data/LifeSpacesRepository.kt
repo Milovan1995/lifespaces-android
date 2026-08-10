@@ -24,11 +24,12 @@ object SpaceCapabilities {
 class LifeSpacesRepository(
     private val spaceDao: SpaceDao,
     private val itemDao: ItemDao,
-    private val reminderDao: ReminderDao,
+    private val shiftDao: ShiftDao,
+    private val alarmDao: AlarmDao,
 ) {
     val spaces: Flow<List<Space>> = spaceDao.observeSpaces()
     val items: Flow<List<Item>> = itemDao.observeItems()
-    val reminders: Flow<List<Reminder>> = reminderDao.observeReminders()
+    val alarms: Flow<List<Alarm>> = alarmDao.observeAlarms()
 
     val homeFeed: Flow<HomeFeed> = combine(spaces, items, spaceDao.observeCapabilities()) { spaces, items, rows ->
         val persisted = rows.groupBy(SpaceCapability::spaceId).mapValues { (_, values) ->
@@ -121,6 +122,16 @@ class LifeSpacesRepository(
 
     suspend fun deleteSpace(spaceId: Long) {
         spaceDao.deleteWithCapabilities(spaceId, System.currentTimeMillis())
+    }
+
+    suspend fun insertAlarm(alarm: Alarm): Long {
+        require((alarm.itemId == null) xor (alarm.shiftDayId == null)) {
+            "Alarm mora imati tačno jednog vlasnika."
+        }
+        val ownerExists = alarm.itemId?.let { itemDao.getById(it) != null }
+            ?: (shiftDao.getDayById(requireNotNull(alarm.shiftDayId)) != null)
+        require(ownerExists) { "Vlasnik alarma ne postoji." }
+        return alarmDao.insert(alarm)
     }
 
     private fun cleanLocation(location: String?, capabilities: Set<String>): String? =
