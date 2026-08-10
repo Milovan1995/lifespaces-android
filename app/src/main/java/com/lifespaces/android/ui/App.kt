@@ -9,6 +9,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.CalendarContract
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -98,6 +99,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.time.LocalDate
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -137,6 +139,9 @@ fun App(viewModel: AppViewModel) {
     var editingSpaceLinks by rememberSaveable { mutableStateOf(false) }
     var editingSpaceColor by rememberSaveable { mutableStateOf<Long?>(null) }
     var confirmingSpaceEditId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var showingCalendar by rememberSaveable { mutableStateOf(false) }
+    var weekStartEpochDay by rememberSaveable { mutableStateOf(mondayOf(LocalDate.now()).toEpochDay()) }
+    var selectedDateEpochDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
     val systemDarkTheme = isSystemInDarkTheme()
     val appearance = remember(context) { context.getSharedPreferences("appearance", 0) }
     var darkTheme by rememberSaveable {
@@ -158,6 +163,7 @@ fun App(viewModel: AppViewModel) {
     LaunchedEffect(state.spaces) {
         SpaceWidget.updateAll(context)
     }
+    BackHandler(enabled = showingCalendar) { showingCalendar = false }
     LifeSpacesTheme(darkTheme = darkTheme) {
         val defaultSpaceAccent = MaterialTheme.colorScheme.primary
         val inboxAccent = MaterialTheme.colorScheme.secondary
@@ -165,8 +171,21 @@ fun App(viewModel: AppViewModel) {
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text("LifeSpaces") },
+                    title = { Text(if (showingCalendar) "Moj kalendar" else "LifeSpaces") },
                     actions = {
+                        IconButton(onClick = {
+                            showingCalendar = !showingCalendar
+                            if (showingCalendar) {
+                                val today = LocalDate.now()
+                                weekStartEpochDay = mondayOf(today).toEpochDay()
+                                selectedDateEpochDay = today.toEpochDay()
+                            }
+                        }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_calendar),
+                                contentDescription = if (showingCalendar) "Zatvori Moj kalendar" else "Otvori Moj kalendar",
+                            )
+                        }
                         IconButton(
                             onClick = {
                                 darkTheme = !darkTheme
@@ -189,6 +208,24 @@ fun App(viewModel: AppViewModel) {
                 )
             },
         ) { innerPadding ->
+            if (showingCalendar) {
+                CalendarScreen(
+                    modifier = Modifier.padding(innerPadding),
+                    items = state.items,
+                    spaces = state.spaces,
+                    weekStart = LocalDate.ofEpochDay(weekStartEpochDay),
+                    selectedDate = LocalDate.ofEpochDay(selectedDateEpochDay),
+                    onPreviousWeek = { weekStartEpochDay = moveCalendarWeek(LocalDate.ofEpochDay(weekStartEpochDay), -1).toEpochDay() },
+                    onNextWeek = { weekStartEpochDay = moveCalendarWeek(LocalDate.ofEpochDay(weekStartEpochDay), 1).toEpochDay() },
+                    onToday = {
+                        val today = LocalDate.now()
+                        weekStartEpochDay = mondayOf(today).toEpochDay()
+                        selectedDateEpochDay = today.toEpochDay()
+                    },
+                    onDateSelected = { selectedDateEpochDay = it.toEpochDay() },
+                    onItemSelected = { expandedItemId = it.id },
+                )
+            } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -602,6 +639,7 @@ fun App(viewModel: AppViewModel) {
                             }
                         }
                     }
+            }
             }
         }
         if (showSpaceCreator) {
@@ -1279,7 +1317,7 @@ internal fun linkItemParts(text: String): Pair<String?, String> {
 internal fun createWebLinkIntent(text: String): Intent? =
     safeWebUri(text)?.let { Intent(Intent.ACTION_VIEW, it) }
 
-private val LifeSpacesCardShape = RoundedCornerShape(24.dp)
+internal val LifeSpacesCardShape = RoundedCornerShape(24.dp)
 
 private val LifeSpacesLightColors = lightColorScheme(
     primary = Color(0xFF5D4BB7),
