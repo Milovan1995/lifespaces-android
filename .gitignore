@@ -4,3 +4,4 @@ build/
 local.properties
 *.iml
 **/build/
+docs/DEVELOPMENT-HANDOFF.md
