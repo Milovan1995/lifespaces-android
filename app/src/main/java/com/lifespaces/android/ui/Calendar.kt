@@ -1,9 +1,9 @@
 package com.lifespaces.android.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,10 +28,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lifespaces.android.data.Item
+import com.lifespaces.android.R
 import com.lifespaces.android.data.Space
 import com.lifespaces.android.data.ShiftDay
 import com.lifespaces.android.data.ShiftType
@@ -61,7 +65,7 @@ internal fun CalendarScreen(
     items: List<Item>,
     spaces: List<Space>,
     weekStart: LocalDate,
-    selectedDate: LocalDate,
+    selectedDate: LocalDate?,
     shiftTypes: List<ShiftType>,
     overrides: List<ShiftWeekdayOverride>,
     shiftDays: List<ShiftDay>,
@@ -69,6 +73,7 @@ internal fun CalendarScreen(
     onNextWeek: () -> Unit,
     onToday: () -> Unit,
     onDateSelected: (LocalDate) -> Unit,
+    onDateDismissed: () -> Unit,
     onItemSelected: (Item) -> Unit,
     onSaveShiftDay: (String, Long?, String?) -> Unit,
     onClearShiftDay: (String) -> Unit,
@@ -77,10 +82,11 @@ internal fun CalendarScreen(
     val days = calendarWeekDays(weekStart)
     val datedItems = datedItemsByDate(items)
     val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy.", Locale.getDefault())
-    LazyColumn(
-        modifier = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
         item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onPreviousWeek) { Text("‹") }
@@ -95,15 +101,12 @@ internal fun CalendarScreen(
         }
         items(days, key = LocalDate::toEpochDay) { date ->
             val isToday = date == today
-            val isSelected = date == selectedDate
             val day = shiftDays.firstOrNull { it.localDate == date.toString() }
             val shift = shiftTypes.firstOrNull { it.id == day?.shiftTypeId }
             val times = shift?.let { effectiveShiftTimes(it, overrides, date) }
             Card(
                 onClick = { onDateSelected(date) },
-                modifier = Modifier.fillMaxWidth().then(
-                    if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, LifeSpacesCardShape) else Modifier,
-                ),
+                modifier = Modifier.fillMaxWidth(),
                 shape = LifeSpacesCardShape,
                 colors = CardDefaults.cardColors(
                     containerColor = if (isToday) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
@@ -136,18 +139,66 @@ internal fun CalendarScreen(
                 }
             }
         }
+        }
+        selectedDate?.let { date ->
+            CalendarDayOverlay(
+                date = date,
+                items = datedItems[date].orEmpty(),
+                spaces = spaces,
+                shiftTypes = shiftTypes,
+                overrides = overrides,
+                shiftDays = shiftDays,
+                onDismiss = onDateDismissed,
+                onItemSelected = onItemSelected,
+                onSaveShiftDay = onSaveShiftDay,
+                onClearShiftDay = onClearShiftDay,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CalendarDayOverlay(
+    date: LocalDate,
+    items: List<Item>,
+    spaces: List<Space>,
+    shiftTypes: List<ShiftType>,
+    overrides: List<ShiftWeekdayOverride>,
+    shiftDays: List<ShiftDay>,
+    onDismiss: () -> Unit,
+    onItemSelected: (Item) -> Unit,
+    onSaveShiftDay: (String, Long?, String?) -> Unit,
+    onClearShiftDay: (String) -> Unit,
+) {
+    val day = shiftDays.firstOrNull { it.localDate == date.toString() }
+    val shift = shiftTypes.firstOrNull { it.id == day?.shiftTypeId }
+    val times = shift?.let { effectiveShiftTimes(it, overrides, date) }
+    val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy.", Locale.getDefault())
+    var changingSchedule by rememberSaveable(date.toString(), day?.id) { mutableStateOf(day == null) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         item {
-            val day = shiftDays.firstOrNull { it.localDate == selectedDate.toString() }
-            val shift = shiftTypes.firstOrNull { it.id == day?.shiftTypeId }
-            val times = shift?.let { effectiveShiftTimes(it, overrides, selectedDate) }
-            var changingSchedule by rememberSaveable(selectedDate.toString(), day?.id) { mutableStateOf(day == null) }
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onDismiss) {
+                    Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Nazad")
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(weekdayName(date), style = MaterialTheme.typography.titleMedium)
+                    Text(dateFormatter.format(date), style = MaterialTheme.typography.titleLarge)
+                }
+            }
+        }
+        item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = LifeSpacesCardShape,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(dateFormatter.format(selectedDate), style = MaterialTheme.typography.titleLarge)
                     Text(
                         when {
                             day == null -> "Nije uneseno"
@@ -158,10 +209,9 @@ internal fun CalendarScreen(
                     )
                     day?.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                     if (!changingSchedule) {
-                        Button(
-                            onClick = { changingSchedule = true },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Promijeni raspored") }
+                        Button(onClick = { changingSchedule = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Promijeni raspored")
+                        }
                     } else {
                         Text("Izaberi raspored", style = MaterialTheme.typography.titleMedium)
                         shiftTypes.chunked(2).forEach { row ->
@@ -171,7 +221,7 @@ internal fun CalendarScreen(
                             ) {
                                 row.forEach { type ->
                                     Button(
-                                        onClick = { onSaveShiftDay(selectedDate.toString(), type.id, day?.note) },
+                                        onClick = { onSaveShiftDay(date.toString(), type.id, day?.note) },
                                         modifier = Modifier.weight(1f),
                                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                                             containerColor = shiftColor(type.color),
@@ -182,21 +232,20 @@ internal fun CalendarScreen(
                             }
                         }
                         Button(
-                            onClick = { onSaveShiftDay(selectedDate.toString(), null, day?.note) },
+                            onClick = { onSaveShiftDay(date.toString(), null, day?.note) },
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("Slobodan dan") }
                         if (day != null) {
-                            TextButton(onClick = { onClearShiftDay(selectedDate.toString()) }) { Text("Poništi") }
+                            TextButton(onClick = { onClearShiftDay(date.toString()) }) { Text("Poništi") }
                         }
                     }
                 }
             }
         }
-        val selectedItems = datedItems[selectedDate].orEmpty()
-        if (selectedItems.isEmpty()) {
+        if (items.isEmpty()) {
             item { Text("Nema stavki za ovaj datum.", style = MaterialTheme.typography.bodyMedium) }
         } else {
-            items(selectedItems, key = Item::id) { item ->
+            items(items, key = Item::id) { item ->
                 CalendarItemCard(item, spaces.firstOrNull { it.id == item.spaceId }) { onItemSelected(item) }
             }
         }
@@ -231,6 +280,19 @@ private fun CalendarItemCard(item: Item, space: Space?, onClick: () -> Unit) {
 
 private data class ShiftTimes(val start: Int, val end: Int, val alarm: Int)
 
+internal data class ShiftAlarmSuggestion(val date: LocalDate, val minute: Int, val shiftName: String)
+
+internal fun shiftAlarmSuggestion(
+    date: LocalDate,
+    shiftTypes: List<ShiftType>,
+    overrides: List<ShiftWeekdayOverride>,
+    shiftDays: List<ShiftDay>,
+): ShiftAlarmSuggestion? {
+    val day = shiftDays.firstOrNull { it.localDate == date.toString() } ?: return null
+    val shift = shiftTypes.firstOrNull { it.id == day.shiftTypeId } ?: return null
+    return ShiftAlarmSuggestion(date, effectiveShiftTimes(shift, overrides, date).alarm, shift.name)
+}
+
 private fun shiftColor(value: Long): Color =
     if (value ushr 32 == 0L) Color(value.toInt()) else Color(value.toULong())
 
@@ -242,12 +304,12 @@ private fun effectiveShiftTimes(
     val override = overrides.firstOrNull { it.shiftTypeId == shift.id && it.weekday == date.dayOfWeek.value }
     return ShiftTimes(
         start = override?.startMinute ?: shift.defaultStartMinute,
-        end = override?.endMinute ?: shift.defaultEndMinute,
+        end = override?.endMinute ?: if (shift.name == "Jutarnja" && shift.defaultEndMinute == 13 * 60) 12 * 60 else shift.defaultEndMinute,
         alarm = override?.alarmMinute ?: shift.defaultAlarmMinute,
     )
 }
 
-private fun formatMinute(value: Int): String = "%02d:%02d".format(value / 60, value % 60)
+internal fun formatMinute(value: Int): String = "%02d:%02d".format(value / 60, value % 60)
 
 private fun weekdayName(date: LocalDate): String = listOf(
     "Ponedjeljak", "Utorak", "Srijeda", "Četvrtak", "Petak", "Subota", "Nedjelja",

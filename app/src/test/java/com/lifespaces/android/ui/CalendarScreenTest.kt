@@ -1,6 +1,9 @@
 package com.lifespaces.android.ui
 
 import com.lifespaces.android.data.Item
+import com.lifespaces.android.data.ShiftDay
+import com.lifespaces.android.data.ShiftType
+import com.lifespaces.android.data.ShiftWeekdayOverride
 import java.time.LocalDate
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
@@ -31,5 +34,22 @@ class CalendarScreenTest {
 
         assertEquals(listOf(first, second), grouped[LocalDate.of(2026, 8, 10)])
         assertEquals(1, grouped.size)
+    }
+
+    @Test
+    fun suggestsConfiguredShiftAlarmIncludingMondayOverride() {
+        val daily = ShiftType(1, "Dnevna", 0, 570, 1050, 450)
+        val monday = LocalDate.of(2026, 8, 10)
+        val tuesday = monday.plusDays(1)
+        val overrides = listOf(ShiftWeekdayOverride(1, 1, alarmMinute = 420))
+
+        assertEquals(
+            420,
+            shiftAlarmSuggestion(monday, listOf(daily), overrides, listOf(ShiftDay(localDate = monday.toString(), shiftTypeId = 1)))?.minute,
+        )
+        assertEquals(
+            450,
+            shiftAlarmSuggestion(tuesday, listOf(daily), overrides, listOf(ShiftDay(localDate = tuesday.toString(), shiftTypeId = 1)))?.minute,
+        )
     }
 }

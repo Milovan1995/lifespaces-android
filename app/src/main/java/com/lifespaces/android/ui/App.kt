@@ -140,9 +140,10 @@ fun App(viewModel: AppViewModel) {
     var editingSpaceLinks by rememberSaveable { mutableStateOf(false) }
     var editingSpaceColor by rememberSaveable { mutableStateOf<Long?>(null) }
     var confirmingSpaceEditId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var showSystemAlarmDialog by rememberSaveable { mutableStateOf(false) }
     var showingCalendar by rememberSaveable { mutableStateOf(false) }
     var weekStartEpochDay by rememberSaveable { mutableStateOf(mondayOf(LocalDate.now()).toEpochDay()) }
-    var selectedDateEpochDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
+    var selectedDateEpochDay by rememberSaveable { mutableStateOf<Long?>(null) }
     val systemDarkTheme = isSystemInDarkTheme()
     val appearance = remember(context) { context.getSharedPreferences("appearance", 0) }
     var darkTheme by rememberSaveable {
@@ -164,7 +165,9 @@ fun App(viewModel: AppViewModel) {
     LaunchedEffect(state.spaces) {
         SpaceWidget.updateAll(context)
     }
-    BackHandler(enabled = showingCalendar) { showingCalendar = false }
+    BackHandler(enabled = showingCalendar) {
+        if (selectedDateEpochDay != null) selectedDateEpochDay = null else showingCalendar = false
+    }
     LifeSpacesTheme(darkTheme = darkTheme) {
         val defaultSpaceAccent = MaterialTheme.colorScheme.primary
         val inboxAccent = MaterialTheme.colorScheme.secondary
@@ -174,12 +177,18 @@ fun App(viewModel: AppViewModel) {
                 TopAppBar(
                     title = { Text(if (showingCalendar) "Moj kalendar" else "LifeSpaces") },
                     actions = {
+                        IconButton(onClick = { showSystemAlarmDialog = true }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_alarm),
+                                contentDescription = "Podesi alarm",
+                            )
+                        }
                         IconButton(onClick = {
                             showingCalendar = !showingCalendar
+                            selectedDateEpochDay = null
                             if (showingCalendar) {
                                 val today = LocalDate.now()
                                 weekStartEpochDay = mondayOf(today).toEpochDay()
-                                selectedDateEpochDay = today.toEpochDay()
                                 viewModel.ensureDefaultShiftTypes()
                             }
                         }) {
@@ -216,7 +225,7 @@ fun App(viewModel: AppViewModel) {
                     items = state.items,
                     spaces = state.spaces,
                     weekStart = LocalDate.ofEpochDay(weekStartEpochDay),
-                    selectedDate = LocalDate.ofEpochDay(selectedDateEpochDay),
+                    selectedDate = selectedDateEpochDay?.let(LocalDate::ofEpochDay),
                     shiftTypes = calendar.shiftTypes,
                     overrides = calendar.overrides,
                     shiftDays = calendar.shiftDays,
@@ -225,9 +234,10 @@ fun App(viewModel: AppViewModel) {
                     onToday = {
                         val today = LocalDate.now()
                         weekStartEpochDay = mondayOf(today).toEpochDay()
-                        selectedDateEpochDay = today.toEpochDay()
+                        selectedDateEpochDay = null
                     },
                     onDateSelected = { selectedDateEpochDay = it.toEpochDay() },
+                    onDateDismissed = { selectedDateEpochDay = null },
                     onItemSelected = { expandedItemId = it.id },
                     onSaveShiftDay = viewModel::saveShiftDay,
                     onClearShiftDay = viewModel::clearShiftDay,
@@ -863,6 +873,29 @@ fun App(viewModel: AppViewModel) {
                 },
             )
         }
+        if (showSystemAlarmDialog) {
+            val tomorrow = LocalDate.now().plusDays(1)
+            val suggestion = shiftAlarmSuggestion(
+                tomorrow,
+                calendar.shiftTypes,
+                calendar.overrides,
+                calendar.shiftDays,
+            )?.takeIf { isSystemAlarmTimeAllowed(it.date, it.minute) }
+            SystemAlarmDialog(
+                label = suggestion?.let { "${it.shiftName} smjena" } ?: "Alarm",
+                preferredDate = suggestion?.date,
+                preferredMinute = suggestion?.minute,
+                onDismiss = { showSystemAlarmDialog = false },
+                onSaveAlarm = { intent ->
+                    try {
+                        context.startActivity(intent)
+                        showSystemAlarmDialog = false
+                    } catch (_: ActivityNotFoundException) {
+                        Toast.makeText(context, "Nije pronađena aplikacija za alarm.", Toast.LENGTH_SHORT).show()
+                    }
+                },
+            )
+        }
         deletingItemId?.let { itemId ->
             AlertDialog(
                 onDismissRequest = { deletingItemId = null },
@@ -1193,7 +1226,7 @@ private fun ItemActionsSheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(item.text, style = MaterialTheme.typography.titleLarge)
+            Text(item.text, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.titleLarge)
             item.scheduledAt?.let {
                 Text(
                     SimpleDateFormat("d. MMM yyyy.", Locale.getDefault()).format(Date(it)),
