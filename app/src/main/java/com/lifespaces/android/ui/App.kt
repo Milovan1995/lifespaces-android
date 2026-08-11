@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -63,6 +64,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.ImeAction
@@ -100,6 +102,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,6 +147,8 @@ fun App(viewModel: AppViewModel) {
     var showingCalendar by rememberSaveable { mutableStateOf(false) }
     var weekStartEpochDay by rememberSaveable { mutableStateOf(mondayOf(LocalDate.now()).toEpochDay()) }
     var selectedDateEpochDay by rememberSaveable { mutableStateOf<Long?>(null) }
+    val homeListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     val systemDarkTheme = isSystemInDarkTheme()
     val appearance = remember(context) { context.getSharedPreferences("appearance", 0) }
     var darkTheme by rememberSaveable {
@@ -175,7 +180,28 @@ fun App(viewModel: AppViewModel) {
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text(if (showingCalendar) "Moj kalendar" else "LifeSpaces") },
+                    title = {
+                        Text(
+                            if (showingCalendar) "Moj kalendar" else "LifeSpaces",
+                            modifier = Modifier.clickable(
+                                onClickLabel = "Vrati na početni ekran",
+                                role = Role.Button,
+                            ) {
+                                showingCalendar = false
+                                selectedDateEpochDay = null
+                                expandedItemId = null
+                                editingItemId = null
+                                editingItemLabel = null
+                                addingItemSpaceId = null
+                                editingSpaceId = null
+                                showSpaceCreator = false
+                                spaceMenuId = null
+                                expandedSpaceId = null
+                                inboxExpanded = false
+                                coroutineScope.launch { homeListState.scrollToItem(0) }
+                            },
+                        )
+                    },
                     actions = {
                         IconButton(onClick = { showSystemAlarmDialog = true }) {
                             Icon(
@@ -244,6 +270,7 @@ fun App(viewModel: AppViewModel) {
                 )
             } else {
             LazyColumn(
+                state = homeListState,
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
