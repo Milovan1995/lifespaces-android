@@ -59,6 +59,20 @@ internal fun datedItemsByDate(
     item.scheduledAt?.let { Instant.ofEpochMilli(it).atZone(zoneId).toLocalDate() to item }
 }.groupBy({ it.first }, { it.second })
 
+internal fun todayAndUpcomingItems(
+    items: List<Item>,
+    today: LocalDate = LocalDate.now(),
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): Pair<List<Item>, List<Item>> {
+    val dated = items.mapNotNull { item ->
+        item.scheduledAt?.let { Instant.ofEpochMilli(it).atZone(zoneId).toLocalDate() to item }
+    }
+    return dated.filter { it.first == today }.map { it.second } to
+        dated.filter { it.first.isAfter(today) }
+            .sortedWith(compareBy<Pair<LocalDate, Item>> { it.first }.thenBy { it.second.scheduledAt ?: Long.MAX_VALUE })
+            .map { it.second }
+}
+
 @Composable
 internal fun CalendarScreen(
     modifier: Modifier = Modifier,

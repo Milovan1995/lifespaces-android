@@ -37,6 +37,24 @@ class CalendarScreenTest {
     }
 
     @Test
+    fun separatesTodayFromFutureItemsInLocalDateOrder() {
+        val today = LocalDate.of(2026, 8, 10)
+        val past = Item(id = 1, text = "Prošlo", scheduledAt = today.minusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        val todayItem = Item(id = 2, text = "Danas", scheduledAt = today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        val later = Item(id = 3, text = "Kasnije", scheduledAt = today.plusDays(2).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        val sooner = Item(id = 4, text = "Uskoro", scheduledAt = today.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+
+        val (todayItems, upcomingItems) = todayAndUpcomingItems(
+            listOf(past, later, Item(id = 5, text = "Bez datuma"), todayItem, sooner),
+            today,
+            ZoneOffset.UTC,
+        )
+
+        assertEquals(listOf(todayItem), todayItems)
+        assertEquals(listOf(sooner, later), upcomingItems)
+    }
+
+    @Test
     fun suggestsConfiguredShiftAlarmIncludingMondayOverride() {
         val daily = ShiftType(1, "Dnevna", 0, 570, 1050, 450)
         val monday = LocalDate.of(2026, 8, 10)

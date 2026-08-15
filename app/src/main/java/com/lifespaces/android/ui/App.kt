@@ -151,6 +151,18 @@ fun App(viewModel: AppViewModel) {
     var selectedDateEpochDay by rememberSaveable { mutableStateOf<Long?>(null) }
     val homeListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val openItemAtHome: (Item) -> Unit = { item ->
+        showingSearch = false
+        searchQuery = ""
+        expandedItemId = null
+        editingItemId = null
+        editingItemLabel = null
+        addingItemSpaceId = null
+        val (targetSpaceId, targetIndex) = searchResultTarget(item, state.spaces)
+        inboxExpanded = targetSpaceId == null
+        expandedSpaceId = targetSpaceId
+        coroutineScope.launch { homeListState.scrollToItem(targetIndex) }
+    }
     val systemDarkTheme = isSystemInDarkTheme()
     val appearance = remember(context) { context.getSharedPreferences("appearance", 0) }
     var darkTheme by rememberSaveable {
@@ -165,6 +177,7 @@ fun App(viewModel: AppViewModel) {
             items
         }
     }
+    val (todayItems, upcomingItems) = todayAndUpcomingItems(state.items)
     val inboxExpansionRotation by animateFloatAsState(
         targetValue = if (inboxExpanded) 180f else 0f,
         label = "inbox expansion",
@@ -307,18 +320,7 @@ fun App(viewModel: AppViewModel) {
                     results = searchItems(state.items, state.spaces, searchQuery),
                     spaces = state.spaces,
                     onQueryChange = { searchQuery = it },
-                    onItemSelected = { item ->
-                        showingSearch = false
-                        searchQuery = ""
-                        expandedItemId = null
-                        editingItemId = null
-                        editingItemLabel = null
-                        addingItemSpaceId = null
-                        val (targetSpaceId, targetIndex) = searchResultTarget(item, state.spaces)
-                        inboxExpanded = targetSpaceId == null
-                        expandedSpaceId = targetSpaceId
-                        coroutineScope.launch { homeListState.scrollToItem(targetIndex) }
-                    },
+                    onItemSelected = openItemAtHome,
                 )
             } else {
             LazyColumn(
@@ -370,6 +372,14 @@ fun App(viewModel: AppViewModel) {
                                 ) { Text("Sačuvaj") }
                             }
                         }
+                    }
+                    item {
+                        TimeOverviewSection(
+                            todayItems = todayItems,
+                            upcomingItems = upcomingItems,
+                            spaces = state.spaces,
+                            onItemSelected = openItemAtHome,
+                        )
                     }
                     item {
                         Card(
@@ -1133,6 +1143,91 @@ private fun SearchScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimeOverviewSection(
+    todayItems: List<Item>,
+    upcomingItems: List<Item>,
+    spaces: List<Space>,
+    onItemSelected: (Item) -> Unit,
+) {
+    val spacesById = spaces.associateBy(Space::id)
+    Card(
+        shape = LifeSpacesCardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OverviewItems(
+                title = "Danas · ${SimpleDateFormat("d. MMM yyyy.", Locale.getDefault()).format(Date())}",
+                items = todayItems,
+                spacesById = spacesById,
+                emptyMessage = "Nema stavki za danas.",
+                onItemSelected = onItemSelected,
+            )
+            HorizontalDivider()
+            OverviewItems(
+                title = "Predstojeće",
+                items = upcomingItems,
+                spacesById = spacesById,
+                emptyMessage = "Nema predstojećih stavki.",
+                showItemDates = true,
+                onItemSelected = onItemSelected,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OverviewItems(
+    title: String,
+    items: List<Item>,
+    spacesById: Map<Long, Space>,
+    emptyMessage: String,
+    showItemDates: Boolean = false,
+    onItemSelected: (Item) -> Unit,
+) {
+    Text(title, style = MaterialTheme.typography.titleMedium)
+    if (items.isEmpty()) {
+        Text(emptyMessage, style = MaterialTheme.typography.bodyMedium)
+    } else {
+        items.forEach { item ->
+            val space = item.spaceId?.let(spacesById::get)
+            val completed = item.completed == true
+            Column(
+                modifier = Modifier.fillMaxWidth().clickable(
+                    onClickLabel = "Otvori stavku",
+                    role = Role.Button,
+                    onClick = { onItemSelected(item) },
+                ).padding(vertical = 4.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        item.text,
+                        modifier = Modifier.weight(1f),
+                        color = if (completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (completed) TextDecoration.LineThrough else TextDecoration.None,
+                    )
+                    if (showItemDates) {
+                        Text(
+                            SimpleDateFormat("d. MMM", Locale.getDefault()).format(Date(requireNotNull(item.scheduledAt))),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Text(
+                    space?.name ?: "Nesortirano",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = space?.color?.let { Color(it.toULong()) } ?: MaterialTheme.colorScheme.secondary,
+                )
             }
         }
     }
