@@ -111,6 +111,7 @@ fun App(viewModel: AppViewModel) {
     val state by viewModel.state.collectAsState()
     val calendar by viewModel.calendar.collectAsState()
     val captureText by viewModel.captureText.collectAsState()
+    val sharedText by viewModel.sharedText.collectAsState()
     var spaceName by rememberSaveable { mutableStateOf("") }
     var spaceLocation by rememberSaveable { mutableStateOf("") }
     var spaceTemplate by rememberSaveable { mutableStateOf("Shopping") }
@@ -144,6 +145,7 @@ fun App(viewModel: AppViewModel) {
     var editingSpaceColor by rememberSaveable { mutableStateOf<Long?>(null) }
     var confirmingSpaceEditId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showSystemAlarmDialog by rememberSaveable { mutableStateOf(false) }
+    var sharedDestinationId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showingSearch by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var showingCalendar by rememberSaveable { mutableStateOf(false) }
@@ -184,6 +186,9 @@ fun App(viewModel: AppViewModel) {
     )
     LaunchedEffect(state.spaces) {
         SpaceWidget.updateAll(context)
+    }
+    LaunchedEffect(sharedText) {
+        sharedDestinationId = null
     }
     BackHandler(enabled = showingCalendar) {
         if (selectedDateEpochDay != null) selectedDateEpochDay = null else showingCalendar = false
@@ -985,6 +990,16 @@ fun App(viewModel: AppViewModel) {
                 },
             )
         }
+        sharedText?.let { text ->
+            SharedTextDialog(
+                text = text,
+                spaces = state.spaces,
+                destinationId = sharedDestinationId,
+                onDestinationSelected = { sharedDestinationId = it },
+                onDismiss = viewModel::dismissSharedText,
+                onSave = { viewModel.saveSharedText(sharedDestinationId) },
+            )
+        }
         deletingItemId?.let { itemId ->
             AlertDialog(
                 onDismissRequest = { deletingItemId = null },
@@ -1076,6 +1091,56 @@ fun App(viewModel: AppViewModel) {
             )
         }
     }
+}
+
+@Composable
+private fun SharedTextDialog(
+    text: String,
+    spaces: List<Space>,
+    destinationId: Long?,
+    onDestinationSelected: (Long?) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+) {
+    var destinationMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    val destinationName = spaces.firstOrNull { it.id == destinationId }?.name ?: "Nesortirano"
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Sačuvaj dijeljeni tekst") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(text)
+                Box {
+                    TextButton(onClick = { destinationMenuExpanded = true }) {
+                        Text("Prostor: $destinationName")
+                    }
+                    DropdownMenu(
+                        expanded = destinationMenuExpanded,
+                        onDismissRequest = { destinationMenuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Nesortirano") },
+                            onClick = {
+                                onDestinationSelected(null)
+                                destinationMenuExpanded = false
+                            },
+                        )
+                        spaces.forEach { space ->
+                            DropdownMenuItem(
+                                text = { Text(space.name) },
+                                onClick = {
+                                    onDestinationSelected(space.id)
+                                    destinationMenuExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onSave) { Text("Sačuvaj") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Otkaži") } },
+    )
 }
 
 @Composable

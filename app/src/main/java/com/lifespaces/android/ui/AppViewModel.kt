@@ -20,6 +20,8 @@ import kotlinx.coroutines.launch
 class AppViewModel(private val repository: LifeSpacesRepository) : ViewModel() {
     private val _captureText = MutableStateFlow("")
     val captureText: StateFlow<String> = _captureText.asStateFlow()
+    private val _sharedText = MutableStateFlow<String?>(null)
+    val sharedText: StateFlow<String?> = _sharedText.asStateFlow()
 
     val state: StateFlow<HomeFeed> = repository.homeFeed.stateIn(
         scope = viewModelScope,
@@ -43,6 +45,20 @@ class AppViewModel(private val repository: LifeSpacesRepository) : ViewModel() {
             repository.createItem(text)
             _captureText.update { "" }
         }
+    }
+
+    fun receiveSharedText(text: String) {
+        _sharedText.value = text
+    }
+
+    fun saveSharedText(spaceId: Long?) {
+        val text = _sharedText.value ?: return
+        _sharedText.value = null
+        viewModelScope.launch { repository.createItem(text, spaceId) }
+    }
+
+    fun dismissSharedText() {
+        _sharedText.value = null
     }
 
     fun addItemToSpace(spaceId: Long, value: String) {
