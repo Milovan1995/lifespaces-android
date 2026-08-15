@@ -20,6 +20,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -115,7 +116,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 fun App(viewModel: AppViewModel) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
@@ -143,6 +144,7 @@ fun App(viewModel: AppViewModel) {
     var voiceNoteDraft by remember { mutableStateOf<VoiceNoteDraft?>(null) }
     var voiceNoteDestinationId by remember { mutableStateOf<Long?>(null) }
     var quickVoiceRecording by remember { mutableStateOf(false) }
+    var completionFilter by rememberSaveable { mutableStateOf(CompletionFilter.ALL) }
     var showSpaceCreator by rememberSaveable { mutableStateOf(false) }
     var createCompletion by rememberSaveable { mutableStateOf(true) }
     var createDate by rememberSaveable { mutableStateOf(true) }
@@ -186,14 +188,15 @@ fun App(viewModel: AppViewModel) {
             if (appearance.contains("dark_theme")) appearance.getBoolean("dark_theme", false) else systemDarkTheme,
         )
     }
-    val inboxItems = state.items.filter { it.spaceId == null }.let { items ->
+    val filteredItems = state.items.filter { it.matches(completionFilter) }
+    val inboxItems = filteredItems.filter { it.spaceId == null }.let { items ->
         if (sortByDate) {
             items.sortedWith(compareBy<Item> { it.scheduledAt == null }.thenBy { it.scheduledAt ?: Long.MAX_VALUE })
         } else {
             items
         }
     }
-    val (todayItems, upcomingItems) = todayAndUpcomingItems(state.items)
+    val (todayItems, upcomingItems) = todayAndUpcomingItems(filteredItems)
     val inboxExpansionRotation by animateFloatAsState(
         targetValue = if (inboxExpanded) 180f else 0f,
         label = "inbox expansion",
@@ -217,7 +220,8 @@ fun App(viewModel: AppViewModel) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                TopAppBar(
+                Column {
+                    TopAppBar(
                     title = {
                         Text(
                             when {
@@ -305,8 +309,9 @@ fun App(viewModel: AppViewModel) {
                             )
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                )
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    )
+                }
             },
         ) { innerPadding ->
             if (showingCalendar) {
@@ -430,6 +435,9 @@ fun App(viewModel: AppViewModel) {
                                 }
                             }
                         }
+                    }
+                    stickyHeader {
+                        CompletionFilterBar(completionFilter) { completionFilter = it }
                     }
                     item {
                         TimeOverviewSection(
@@ -559,7 +567,8 @@ fun App(viewModel: AppViewModel) {
                         val hasDate = SpaceCapabilities.DATE in capabilities
                         val hasLocation = SpaceCapabilities.LOCATION in capabilities
                         val hasLinks = SpaceCapabilities.LINKS in capabilities
-                        val spaceItems = state.items.filter { it.spaceId == space.id }
+                        val allSpaceItems = state.items.filter { it.spaceId == space.id }
+                        val spaceItems = filteredItems.filter { it.spaceId == space.id }
                         val displayedItems = if (sortByDate && hasDate) {
                             spaceItems.sortedWith(compareBy<Item> { it.scheduledAt == null }.thenBy { it.scheduledAt ?: Long.MAX_VALUE })
                         } else {
@@ -810,7 +819,11 @@ fun App(viewModel: AppViewModel) {
                             if (spaceItems.isEmpty() && addingItemSpaceId != space.id) {
                                 item(key = "space-empty-${space.id}") {
                                     SpaceChild(accent = spaceAccent) {
-                                        Text("Ovaj prostor još nema stavki.", style = MaterialTheme.typography.bodyMedium)
+                                        Text(
+                                            if (allSpaceItems.isEmpty()) "Ovaj prostor još nema stavki."
+                                            else "Nema stavki za izabrani filter.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
                                     }
                                 }
                             }
@@ -1314,6 +1327,63 @@ private fun VoiceNotePlayback(note: VoiceNote) {
 }
 
 private fun formatVoiceDuration(ms: Long): String = "%02d:%02d".format(ms / 60_000, (ms / 1_000) % 60)
+
+internal enum class CompletionFilter(
+    val icon: Int,
+    val label: String,
+    val description: String,
+) {
+    ALL(R.drawable.ic_filter_all, "Sve", "Sve stavke"),
+    DONE(R.drawable.ic_filter_done, "Završeno", "Odrađene stavke"),
+    REMAINING(R.drawable.ic_filter_remaining, "Preostalo", "Preostale stavke"),
+}
+
+internal fun Item.matches(filter: CompletionFilter): Boolean = when (filter) {
+    CompletionFilter.ALL -> true
+    CompletionFilter.DONE -> completed == true
+    CompletionFilter.REMAINING -> completed != true
+}
+
+@Composable
+private fun CompletionFilterBar(
+    selected: CompletionFilter,
+    onSelected: (CompletionFilter) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(start = 16.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CompletionFilter.entries.forEach { filter ->
+            val active = filter == selected
+            IconButton(
+                onClick = { onSelected(filter) },
+                modifier = Modifier.padding(start = 2.dp).semantics { contentDescription = filter.description },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(
+                            if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            CircleShape,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(filter.icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        Text(selected.label, style = MaterialTheme.typography.labelMedium)
+    }
+}
 
 @Composable
 private fun SearchScreen(
