@@ -580,11 +580,7 @@ fun App(viewModel: AppViewModel) {
                         } else {
                             spaceItems
                         }
-                        val openItemCount = if (hasCompletion) {
-                            spaceItems.count { it.completed != true }
-                        } else {
-                            spaceItems.size
-                        }
+                        val itemCount = spaceItems.size
                         item(key = "space-${space.id}") {
                             val expansionRotation by animateFloatAsState(
                                 targetValue = if (expandedSpaceId == space.id) 180f else 0f,
@@ -626,7 +622,7 @@ fun App(viewModel: AppViewModel) {
                                             modifier = Modifier.weight(1f),
                                             verticalArrangement = Arrangement.spacedBy(2.dp),
                                         ) {
-                                            Text("${space.name} ($openItemCount)", style = MaterialTheme.typography.titleMedium)
+                                            Text("${space.name} ($itemCount)", style = MaterialTheme.typography.titleMedium)
                                             if (hasLocation) {
                                                 space.location?.let {
                                                     Text(it, style = MaterialTheme.typography.bodySmall)
@@ -1362,7 +1358,7 @@ internal enum class CompletionFilter(
 
 internal fun Item.matches(filter: CompletionFilter): Boolean = when (filter) {
     CompletionFilter.ALL -> true
-    CompletionFilter.DONE -> completed == true
+    CompletionFilter.DONE -> completed != false
     CompletionFilter.REMAINING -> completed != true
 }
 

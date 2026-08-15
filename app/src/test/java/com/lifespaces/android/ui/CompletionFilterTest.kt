@@ -16,7 +16,8 @@ class CompletionFilterTest {
         assertTrue(done.matches(CompletionFilter.DONE))
         assertFalse(done.matches(CompletionFilter.REMAINING))
         assertTrue(remaining.matches(CompletionFilter.REMAINING))
+        assertFalse(remaining.matches(CompletionFilter.DONE))
+        assertTrue(plain.matches(CompletionFilter.DONE))
         assertTrue(plain.matches(CompletionFilter.REMAINING))
-        assertFalse(plain.matches(CompletionFilter.DONE))
     }
 }
