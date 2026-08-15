@@ -14,25 +14,36 @@ import java.time.ZoneId
         Space::class,
         SpaceCapability::class,
         Item::class,
+        VoiceNote::class,
         ShiftType::class,
         ShiftWeekdayOverride::class,
         ShiftDay::class,
         Alarm::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun spaceDao(): SpaceDao
     abstract fun itemDao(): ItemDao
+    abstract fun voiceNoteDao(): VoiceNoteDao
     abstract fun shiftDao(): ShiftDao
     abstract fun alarmDao(): AlarmDao
 
     companion object {
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "lifespaces.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
+    }
+}
+
+internal val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS `voice_notes` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `itemId` INTEGER NOT NULL, `filePath` TEXT NOT NULL, `durationMs` INTEGER NOT NULL, `byteSize` INTEGER NOT NULL, FOREIGN KEY(`itemId`) REFERENCES `items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)""",
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_voice_notes_itemId` ON `voice_notes` (`itemId`)")
     }
 }
 

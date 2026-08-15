@@ -1,6 +1,11 @@
 package com.lifespaces.android.data
 
 import androidx.compose.ui.graphics.Color
+import java.io.File
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -27,6 +32,7 @@ class LifeSpacesRepository(
     private val itemDao: ItemDao,
     private val shiftDao: ShiftDao,
     private val alarmDao: AlarmDao,
+    private val voiceNoteDao: VoiceNoteDao,
 ) {
     val spaces: Flow<List<Space>> = spaceDao.observeSpaces()
     val items: Flow<List<Item>> = itemDao.observeItems()
@@ -37,13 +43,14 @@ class LifeSpacesRepository(
         shiftDao.observeDays(),
     ) { types, overrides, days -> CalendarFeed(types, overrides, days) }
 
-    val homeFeed: Flow<HomeFeed> = combine(spaces, items, spaceDao.observeCapabilities()) { spaces, items, rows ->
+    val homeFeed: Flow<HomeFeed> = combine(spaces, items, spaceDao.observeCapabilities(), voiceNoteDao.observeNotes()) { spaces, items, rows, voiceNotes ->
         val persisted = rows.groupBy(SpaceCapability::spaceId).mapValues { (_, values) ->
             values.mapTo(mutableSetOf(), SpaceCapability::capability)
         }
         HomeFeed(
             spaces = spaces,
             items = items,
+            voiceNotes = voiceNotes.associateBy(VoiceNote::itemId),
             capabilities = spaces.associate { space ->
                 space.id to (persisted[space.id] ?: SpaceCapabilities.defaults(space.template).let { defaults ->
                     if (space.location.isNullOrBlank()) defaults else defaults + SpaceCapabilities.LOCATION
@@ -103,6 +110,23 @@ class LifeSpacesRepository(
     suspend fun createItem(text: String, spaceId: Long? = null): Long =
         itemDao.insert(Item(text = text, spaceId = spaceId))
 
+    suspend fun createVoiceNote(
+        file: File,
+        durationMs: Long,
+        label: String,
+        spaceId: Long? = null,
+    ): Long {
+        require(file.exists() && file.length() > 0L) { "Snimak ne postoji." }
+        require(durationMs in 1..VOICE_NOTE_MAX_DURATION_MS) { "Snimak je predugačak." }
+        require(voiceNoteDao.totalByteSize() + file.length() <= VOICE_NOTE_STORAGE_LIMIT_BYTES) { "Dostignut je limit za snimke." }
+        val recordedAt = DateTimeFormatter.ofPattern("d. MMM yyyy. HH:mm", Locale.getDefault())
+            .format(Instant.now().atZone(ZoneId.systemDefault()))
+        val title = label.trim().ifEmpty { "Glasovna bilješka" }
+        val itemId = itemDao.insert(Item(text = "$title · $recordedAt", spaceId = spaceId))
+        voiceNoteDao.insert(VoiceNote(itemId = itemId, filePath = file.absolutePath, durationMs = durationMs, byteSize = file.length()))
+        return itemId
+    }
+
     suspend fun updateItemText(itemId: Long, text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
@@ -123,6 +147,7 @@ class LifeSpacesRepository(
 
     suspend fun deleteItem(itemId: Long) {
         val item = itemDao.getById(itemId) ?: return
+        voiceNoteDao.getByItemId(itemId)?.let { File(it.filePath).delete() }
         itemDao.delete(item)
     }
 
@@ -191,7 +216,11 @@ data class HomeFeed(
     val spaces: List<Space>,
     val items: List<Item>,
     val capabilities: Map<Long, Set<String>> = emptyMap(),
+    val voiceNotes: Map<Long, VoiceNote> = emptyMap(),
 )
+
+const val VOICE_NOTE_MAX_DURATION_MS = 5 * 60 * 1000L
+const val VOICE_NOTE_STORAGE_LIMIT_BYTES = 100L * 1024 * 1024
 
 data class CalendarFeed(
     val shiftTypes: List<ShiftType> = emptyList(),

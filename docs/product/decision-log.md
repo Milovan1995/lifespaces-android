@@ -37,3 +37,5 @@
 | 2026-07-26 | Keep completed Shopping items visible and crossed out. | Completion communicates status without hiding information; the user deletes an item when it is no longer useful. |
 | 2026-07-26 | Allow manual drag-and-drop order within a space. | Users need a simple way to arrange active items without adding sorting rules or priorities. |
 | 2026-07-26 | Let users sort items by their characteristics. | Item-level data such as date should support useful ordering in addition to manual ordering. |
+| 2026-08-15 | Defer in-app speech-to-text until a practical strictly offline engine is validated. | The tiny Whisper experiment on the Galaxy A33 was too slow and inaccurate for quick capture; a dictated note must not silently send personal audio to a remote recognition service. |
+| 2026-08-15 | Store voice notes as private AAC/M4A attachments to items. | This provides offline voice capture without transcription; each note has an optional label and captured date/time, is limited to five minutes, and all notes together to 100 MiB, with no automatic deletion. |

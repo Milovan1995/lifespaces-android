@@ -2,7 +2,9 @@ package com.lifespaces.android.ui
 
 import android.app.DatePickerDialog
 import android.app.Activity
+import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -10,6 +12,8 @@ import android.net.Uri
 import android.provider.CalendarContract
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -96,6 +100,11 @@ import com.lifespaces.android.R
 import com.lifespaces.android.data.Item
 import com.lifespaces.android.data.Space
 import com.lifespaces.android.data.SpaceCapabilities
+import com.lifespaces.android.data.VoiceNote
+import com.lifespaces.android.data.VOICE_NOTE_MAX_DURATION_MS
+import com.lifespaces.android.voice.VoiceNoteDraft
+import com.lifespaces.android.voice.VoiceNotePlayer
+import com.lifespaces.android.voice.VoiceNoteRecorder
 import com.lifespaces.android.widget.SpaceWidget
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -103,6 +112,7 @@ import java.util.Date
 import java.util.Locale
 import java.time.LocalDate
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,6 +139,9 @@ fun App(viewModel: AppViewModel) {
     var addingItemSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
     var newSpaceItemLabel by rememberSaveable { mutableStateOf("") }
     var newSpaceItemText by rememberSaveable { mutableStateOf("") }
+    var voiceNoteLabel by rememberSaveable { mutableStateOf("") }
+    var voiceNoteDraft by remember { mutableStateOf<VoiceNoteDraft?>(null) }
+    var voiceNoteDestinationId by remember { mutableStateOf<Long?>(null) }
     var showSpaceCreator by rememberSaveable { mutableStateOf(false) }
     var createCompletion by rememberSaveable { mutableStateOf(true) }
     var createDate by rememberSaveable { mutableStateOf(true) }
@@ -375,6 +388,38 @@ fun App(viewModel: AppViewModel) {
                                     modifier = Modifier.fillMaxWidth(),
                                     enabled = captureText.isNotBlank(),
                                 ) { Text("Sačuvaj") }
+                                OutlinedTextField(
+                                    value = voiceNoteLabel,
+                                    onValueChange = { voiceNoteLabel = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text("Naziv glasovne bilješke (opciono)") },
+                                    singleLine = true,
+                                )
+                                if (voiceNoteDraft == null) {
+                                    VoiceNoteRecorderControl {
+                                        voiceNoteDraft = it
+                                        voiceNoteDestinationId = null
+                                    }
+                                }
+                                voiceNoteDraft?.takeIf { voiceNoteDestinationId == null }?.let { draft ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        VoiceNotePlayback(VoiceNote(itemId = -1, filePath = draft.file.path, durationMs = draft.durationMs, byteSize = draft.file.length()))
+                                        Text(formatVoiceDuration(draft.durationMs), modifier = Modifier.weight(1f))
+                                        Button(onClick = {
+                                            viewModel.saveVoiceNote(draft.file, draft.durationMs, voiceNoteLabel, null, {
+                                                voiceNoteDraft = null
+                                                voiceNoteLabel = ""
+                                            }, {
+                                                Toast.makeText(context, it, Toast.LENGTH_LONG).show(); voiceNoteDraft = null
+                                            })
+                                        }) { Text("Sačuvaj") }
+                                        TextButton(onClick = {
+                                            draft.file.delete()
+                                            voiceNoteDraft = null
+                                            voiceNoteLabel = ""
+                                        }) { Text("Otkaži") }
+                                    }
+                                }
                             }
                         }
                     }
@@ -435,6 +480,7 @@ fun App(viewModel: AppViewModel) {
                             SpaceChild(accent = inboxAccent) {
                                 ItemCard(
                                     item = item,
+                                    voiceNote = state.voiceNotes[item.id],
                                     spaces = state.spaces,
                                     showCompletion = false,
                                     showDateActions = true,
@@ -696,6 +742,47 @@ fun App(viewModel: AppViewModel) {
                                                         style = MaterialTheme.typography.bodySmall,
                                                     )
                                                 }
+                                                OutlinedTextField(
+                                                    value = voiceNoteLabel,
+                                                    onValueChange = { voiceNoteLabel = it },
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    label = { Text("Naziv glasovne bilješke (opciono)") },
+                                                    singleLine = true,
+                                                )
+                                                if (voiceNoteDraft == null) {
+                                                    VoiceNoteRecorderControl {
+                                                        voiceNoteDraft = it
+                                                        voiceNoteDestinationId = space.id
+                                                    }
+                                                }
+                                                voiceNoteDraft?.takeIf { voiceNoteDestinationId == space.id }?.let { draft ->
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        VoiceNotePlayback(
+                                                            VoiceNote(
+                                                                itemId = -1,
+                                                                filePath = draft.file.path,
+                                                                durationMs = draft.durationMs,
+                                                                byteSize = draft.file.length(),
+                                                            ),
+                                                        )
+                                                        Text(formatVoiceDuration(draft.durationMs), modifier = Modifier.weight(1f))
+                                                        Button(onClick = {
+                                                            viewModel.saveVoiceNote(draft.file, draft.durationMs, voiceNoteLabel, space.id, {
+                                                                voiceNoteDraft = null
+                                                                voiceNoteLabel = ""
+                                                                addingItemSpaceId = null
+                                                            }, {
+                                                                Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                                                                voiceNoteDraft = null
+                                                            })
+                                                        }) { Text("Sačuvaj") }
+                                                        TextButton(onClick = {
+                                                            draft.file.delete()
+                                                            voiceNoteDraft = null
+                                                            voiceNoteLabel = ""
+                                                        }) { Text("Otkaži") }
+                                                    }
+                                                }
                                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                     Button(
                                                         onClick = saveItem,
@@ -723,6 +810,7 @@ fun App(viewModel: AppViewModel) {
                                 SpaceChild(accent = spaceAccent) {
                                     ItemCard(
                                     item = item,
+                                    voiceNote = state.voiceNotes[item.id],
                                     spaces = state.spaces,
                                     showCompletion = hasCompletion,
                                     showDateActions = hasDate || item.scheduledAt != null,
@@ -1159,6 +1247,54 @@ private fun SpaceChild(accent: Color, content: @Composable () -> Unit) {
 }
 
 @Composable
+private fun VoiceNoteRecorderControl(onRecorded: (VoiceNoteDraft) -> Unit) {
+    val context = LocalContext.current
+    val recorder = remember { VoiceNoteRecorder(context.applicationContext) }
+    var recording by remember { mutableStateOf(false) }
+    var elapsed by remember { mutableStateOf(0L) }
+    fun stop() { recorder.stop()?.let(onRecorded); recording = false }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        if (it) runCatching { recorder.start() }
+            .onSuccess { recording = true }
+            .onFailure { Toast.makeText(context, "Mikrofon nije dostupan.", Toast.LENGTH_SHORT).show() }
+        else Toast.makeText(context, "Dozvola za mikrofon nije odobrena.", Toast.LENGTH_SHORT).show()
+    }
+    LaunchedEffect(recording) {
+        while (recording) {
+            elapsed = recorder.elapsedMs()
+            if (elapsed >= VOICE_NOTE_MAX_DURATION_MS) stop()
+            delay(250)
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { if (recording) recorder.discard() } }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = {
+            if (recording) stop()
+            else if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                runCatching { recorder.start() }
+                    .onSuccess { recording = true }
+                    .onFailure { Toast.makeText(context, "Mikrofon nije dostupan.", Toast.LENGTH_SHORT).show() }
+            } else permission.launch(Manifest.permission.RECORD_AUDIO)
+        }) {
+            Icon(painterResource(if (recording) R.drawable.ic_stop else R.drawable.ic_mic), if (recording) "Zaustavi snimanje" else "Snimi glasovnu bilješku")
+        }
+        Text(if (recording) "Snimam ${formatVoiceDuration(elapsed)}" else "Snimi glasovnu bilješku")
+    }
+}
+
+@Composable
+private fun VoiceNotePlayback(note: VoiceNote) {
+    val player = remember { VoiceNotePlayer() }
+    var playing by remember { mutableStateOf(false) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { player.release() } }
+    IconButton(onClick = { playing = player.toggle(java.io.File(note.filePath)) { playing = false } }) {
+        Icon(painterResource(if (playing) R.drawable.ic_stop else R.drawable.ic_play), if (playing) "Zaustavi preslušavanje" else "Pusti glasovnu bilješku")
+    }
+}
+
+private fun formatVoiceDuration(ms: Long): String = "%d:%02d".format(ms / 60_000, (ms / 1_000) % 60)
+
+@Composable
 private fun SearchScreen(
     modifier: Modifier,
     query: String,
@@ -1391,6 +1527,7 @@ private fun SpaceColorPicker(selectedColor: Long?, onColorSelected: (Long?) -> U
 @Composable
 private fun ItemCard(
     item: Item,
+    voiceNote: VoiceNote?,
     spaces: List<Space>,
     showCompletion: Boolean,
     showDateActions: Boolean,
@@ -1473,6 +1610,7 @@ private fun ItemCard(
                             onCheckedChange = { onCompletedChange(it) },
                         )
                     }
+                    voiceNote?.let { VoiceNotePlayback(it) }
                     Text(
                         text = item.text,
                         modifier = Modifier.weight(1f).padding(top = 12.dp),
@@ -1737,6 +1875,7 @@ private fun ItemCardPreview() {
     MaterialTheme {
         ItemCard(
             item = Item(id = 1, text = "Mlijeko"),
+            voiceNote = null,
             spaces = listOf(Space(id = 2, name = "Voli", template = "Shopping")),
             showCompletion = true,
             showDateActions = true,

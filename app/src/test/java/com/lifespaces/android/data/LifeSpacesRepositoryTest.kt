@@ -2,10 +2,12 @@ package com.lifespaces.android.data
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -26,7 +28,7 @@ class LifeSpacesRepositoryTest {
             ApplicationProvider.getApplicationContext(),
             AppDatabase::class.java,
         ).allowMainThreadQueries().build()
-        repository = LifeSpacesRepository(db.spaceDao(), db.itemDao(), db.shiftDao(), db.alarmDao())
+        repository = LifeSpacesRepository(db.spaceDao(), db.itemDao(), db.shiftDao(), db.alarmDao(), db.voiceNoteDao())
     }
 
     @After
@@ -59,6 +61,21 @@ class LifeSpacesRepositoryTest {
         repository.deleteItem(itemId)
 
         assertEquals(0, repository.items.first().size)
+    }
+
+    @Test
+    fun voiceNote_isAttachedToItemAndFileIsRemovedWithItem() = runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val file = File(context.cacheDir, "voice-note-test.m4a").apply { writeBytes(byteArrayOf(1)) }
+
+        val itemId = repository.createVoiceNote(file, durationMs = 1_000, label = "Shopping")
+
+        assertTrue(repository.items.first().single().text.startsWith("Shopping · "))
+        assertEquals(file.absolutePath, repository.homeFeed.first().voiceNotes[itemId]?.filePath)
+
+        repository.deleteItem(itemId)
+
+        assertFalse(file.exists())
     }
 
     @Test

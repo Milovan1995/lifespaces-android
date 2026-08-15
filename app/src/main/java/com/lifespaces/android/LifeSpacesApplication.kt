@@ -7,6 +7,6 @@ import com.lifespaces.android.data.LifeSpacesRepository
 class LifeSpacesApplication : Application() {
     val database by lazy { AppDatabase.create(this) }
     val repository by lazy {
-        LifeSpacesRepository(database.spaceDao(), database.itemDao(), database.shiftDao(), database.alarmDao())
+        LifeSpacesRepository(database.spaceDao(), database.itemDao(), database.shiftDao(), database.alarmDao(), database.voiceNoteDao())
     }
 }

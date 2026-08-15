@@ -9,6 +9,7 @@ import com.lifespaces.android.data.CalendarFeed
 import com.lifespaces.android.data.ShiftDay
 import com.lifespaces.android.data.ShiftType
 import com.lifespaces.android.data.ShiftWeekdayOverride
+import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +66,24 @@ class AppViewModel(private val repository: LifeSpacesRepository) : ViewModel() {
         val text = value.trim()
         if (text.isEmpty()) return
         viewModelScope.launch { repository.createItem(text, spaceId) }
+    }
+
+    fun saveVoiceNote(
+        file: File,
+        durationMs: Long,
+        label: String,
+        spaceId: Long?,
+        onSaved: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            runCatching { repository.createVoiceNote(file, durationMs, label, spaceId) }
+                .onSuccess { onSaved() }
+                .onFailure {
+                    file.delete()
+                    onError(it.message ?: "Snimak nije sačuvan.")
+                }
+        }
     }
 
     fun createSpace(name: String, template: String, location: String = "") {

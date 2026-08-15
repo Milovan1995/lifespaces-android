@@ -117,6 +117,21 @@ interface ItemDao {
 }
 
 @Dao
+interface VoiceNoteDao {
+    @Query("SELECT * FROM voice_notes")
+    fun observeNotes(): Flow<List<VoiceNote>>
+
+    @Insert
+    suspend fun insert(note: VoiceNote): Long
+
+    @Query("SELECT COALESCE(SUM(byteSize), 0) FROM voice_notes")
+    suspend fun totalByteSize(): Long
+
+    @Query("SELECT * FROM voice_notes WHERE itemId = :itemId LIMIT 1")
+    suspend fun getByItemId(itemId: Long): VoiceNote?
+}
+
+@Dao
 interface ShiftDao {
     @Query("SELECT * FROM shift_types ORDER BY id ASC")
     fun observeTypes(): Flow<List<ShiftType>>

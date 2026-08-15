@@ -20,6 +20,45 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class AppDatabaseMigrationTest {
     @Test
+    fun migration2To3_addsVoiceNotesWithoutChangingItems() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase(VOICE_NOTES_DATABASE_NAME)
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(VOICE_NOTES_DATABASE_NAME)
+                .callback(
+                    object : SupportSQLiteOpenHelper.Callback(2) {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            db.execSQL(
+                                """CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, spaceId INTEGER, text TEXT NOT NULL, scheduledAt INTEGER, completed INTEGER, sortOrder INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)""",
+                            )
+                        }
+
+                        override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+                    },
+                )
+                .build(),
+        )
+        try {
+            helper.writableDatabase.apply {
+                execSQL("INSERT INTO items (id, spaceId, text, scheduledAt, completed, sortOrder, createdAt, updatedAt) VALUES (4, NULL, 'Existing item', NULL, NULL, 0, 1, 1)")
+                MIGRATION_2_3.migrate(this)
+                execSQL("INSERT INTO voice_notes (itemId, filePath, durationMs, byteSize) VALUES (4, '/files/note.m4a', 1000, 20)")
+                query("SELECT itemId, filePath, durationMs, byteSize FROM voice_notes").use { cursor ->
+                    cursor.moveToFirst()
+                    assertEquals(4L, cursor.getLong(0))
+                    assertEquals("/files/note.m4a", cursor.getString(1))
+                    assertEquals(1_000L, cursor.getLong(2))
+                    assertEquals(20L, cursor.getLong(3))
+                }
+            }
+        } finally {
+            helper.close()
+            context.deleteDatabase(VOICE_NOTES_DATABASE_NAME)
+        }
+    }
+
+    @Test
     fun migration1To2_preservesExistingDataAndConvertsReminders() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val previousTimeZone = TimeZone.getDefault()
@@ -46,7 +85,7 @@ class AppDatabaseMigrationTest {
             }
 
             val room = Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .allowMainThreadQueries()
                 .build()
             try {
@@ -144,5 +183,6 @@ class AppDatabaseMigrationTest {
 
     private companion object {
         const val DATABASE_NAME = "migration-1-2"
+        const val VOICE_NOTES_DATABASE_NAME = "migration-2-3"
     }
 }

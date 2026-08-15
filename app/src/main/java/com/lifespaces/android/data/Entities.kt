@@ -35,6 +35,26 @@ data class Item(
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
+@Entity(
+    tableName = "voice_notes",
+    foreignKeys = [
+        ForeignKey(
+            entity = Item::class,
+            parentColumns = ["id"],
+            childColumns = ["itemId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["itemId"], unique = true)],
+)
+data class VoiceNote(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val itemId: Long,
+    val filePath: String,
+    val durationMs: Long,
+    val byteSize: Long,
+)
+
 @Entity(tableName = "shift_types")
 data class ShiftType(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
