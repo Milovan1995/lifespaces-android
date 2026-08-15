@@ -33,7 +33,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -76,6 +78,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Brush
@@ -437,7 +440,10 @@ fun App(viewModel: AppViewModel) {
                         }
                     }
                     stickyHeader {
-                        CompletionFilterBar(completionFilter) { completionFilter = it }
+                        CompletionFilterBar(
+                            selected = completionFilter,
+                            onSelected = { completionFilter = it },
+                        )
                     }
                     item {
                         TimeOverviewSection(
@@ -838,10 +844,10 @@ fun App(viewModel: AppViewModel) {
                                     isEditing = editingItemId == item.id,
                                     editingLabel = if (editingItemId == item.id) editingItemLabel else null,
                                     editingText = if (editingItemId == item.id) editingText else item.text,
-                                    onToggleExpanded = {
-                                        expandedItemId = item.id
-                                        editingItemId = null
-                                        editingItemLabel = null
+                                    onToggleExpanded = if (hasCompletion) {
+                                        { viewModel.setItemCompleted(item.id, item.completed != true) }
+                                    } else {
+                                        null
                                     },
                                     onLabelChange = { editingItemLabel = it },
                                     onTextChange = { editingText = it },
@@ -854,6 +860,22 @@ fun App(viewModel: AppViewModel) {
                                         editingItemLabel = null
                                     },
                                     onCompletedChange = { viewModel.setItemCompleted(item.id, it) },
+                                    itemActions = {
+                                        ItemQuickActions(
+                                            item = item,
+                                            spaces = state.spaces,
+                                            showDateActions = hasDate || item.scheduledAt != null,
+                                            onEdit = {
+                                                editingItemId = item.id
+                                                val (label, content) = linkItemParts(item.text)
+                                                editingItemLabel = label
+                                                editingText = content
+                                            },
+                                            onMove = { destination -> viewModel.moveItem(item.id, destination) },
+                                            onDelete = { deletingItemId = item.id },
+                                            onSchedule = { viewModel.setItemScheduledAt(item.id, it) },
+                                        )
+                                    },
                                     )
                                 }
                             }
@@ -1347,13 +1369,16 @@ internal fun Item.matches(filter: CompletionFilter): Boolean = when (filter) {
 @Composable
 private fun CompletionFilterBar(
     selected: CompletionFilter,
+    modifier: Modifier = Modifier,
     onSelected: (CompletionFilter) -> Unit,
 ) {
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
+            .requiredWidth(screenWidth + 32.dp)
+            .offset(x = (-16).dp)
             .background(MaterialTheme.colorScheme.background)
-            .padding(start = 16.dp, bottom = 4.dp),
+            .padding(start = 32.dp, end = 16.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1651,11 +1676,12 @@ private fun ItemCard(
     isEditing: Boolean,
     editingLabel: String?,
     editingText: String,
-    onToggleExpanded: () -> Unit,
+    onToggleExpanded: (() -> Unit)?,
     onLabelChange: (String) -> Unit,
     onTextChange: (String) -> Unit,
     onSave: () -> Unit,
     onCompletedChange: (Boolean) -> Unit,
+    itemActions: @Composable () -> Unit = {},
 ) {
     val completed = showCompletion && item.completed == true
     val activeCardColor = spaces.firstOrNull { it.id == item.spaceId }?.color?.let { color ->
@@ -1678,11 +1704,14 @@ private fun ItemCard(
         label = "item scale",
     )
     Card(
-        onClick = { if (!isEditing) onToggleExpanded() },
         modifier = Modifier.fillMaxWidth().animateContentSize().graphicsLayer {
             scaleX = cardScale
             scaleY = cardScale
-        },
+        }.then(
+            onToggleExpanded?.let { onClick ->
+                Modifier.clickable(enabled = !isEditing, onClick = onClick)
+            } ?: Modifier,
+        ),
         shape = LifeSpacesCardShape,
         colors = CardDefaults.cardColors(
             containerColor = cardColor,
@@ -1740,6 +1769,7 @@ private fun ItemCard(
                         },
                     )
                 }
+                itemActions()
                 item.scheduledAt?.takeIf { showDateActions }?.let {
                     Text(
                         "Datum: ${SimpleDateFormat("d. MMM yyyy.", Locale.getDefault()).format(Date(it))}",
@@ -1749,6 +1779,146 @@ private fun ItemCard(
             }
         }
     }
+}
+
+@Composable
+private fun ItemQuickActions(
+    item: Item,
+    spaces: List<Space>,
+    showDateActions: Boolean,
+    onEdit: () -> Unit,
+    onMove: (Long?) -> Unit,
+    onDelete: () -> Unit,
+    onSchedule: (Long?) -> Unit,
+) {
+    val context = LocalContext.current
+    var moveExpanded by remember { mutableStateOf(false) }
+    var calendarExpanded by remember { mutableStateOf(false) }
+    var linkExpanded by remember { mutableStateOf(false) }
+    val linkIntent = createWebLinkIntent(item.text)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ItemActionButton(R.drawable.ic_edit, "Uredi stavku", onEdit)
+        Box {
+            ItemActionButton(R.drawable.ic_move, "Premjesti stavku", onClick = { moveExpanded = true })
+            DropdownMenu(expanded = moveExpanded, onDismissRequest = { moveExpanded = false }) {
+                DropdownMenuItem(
+                    text = { Text("Nesortirano") },
+                    onClick = { moveExpanded = false; onMove(null) },
+                )
+                spaces.forEach { space ->
+                    DropdownMenuItem(
+                        text = { Text(space.name) },
+                        onClick = { moveExpanded = false; onMove(space.id) },
+                    )
+                }
+            }
+        }
+        if (showDateActions) {
+            Box {
+                ItemActionButton(R.drawable.ic_calendar, "Akcije datuma", onClick = { calendarExpanded = true })
+                DropdownMenu(expanded = calendarExpanded, onDismissRequest = { calendarExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text(if (item.scheduledAt == null) "Dodaj datum" else "Promijeni datum") },
+                            onClick = {
+                                calendarExpanded = false
+                                showItemDatePicker(context, item, onSchedule)
+                            },
+                        )
+                        if (item.scheduledAt != null) {
+                            DropdownMenuItem(
+                                text = { Text("Ukloni datum") },
+                                onClick = { calendarExpanded = false; onSchedule(null) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Dodaj u kalendar") },
+                                onClick = {
+                                    calendarExpanded = false
+                                    val location = spaces.firstOrNull { it.id == item.spaceId }?.location
+                                    try {
+                                        context.startActivity(createCalendarInsertIntent(item, location))
+                                    } catch (_: ActivityNotFoundException) {
+                                        Toast.makeText(context, "Nije pronađena aplikacija kalendara.", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                            )
+                        }
+                }
+            }
+        }
+        linkIntent?.let { intent ->
+            Box {
+                ItemActionButton(R.drawable.ic_more_vert, "Akcije linka", onClick = { linkExpanded = true })
+                DropdownMenu(expanded = linkExpanded, onDismissRequest = { linkExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Otvori link") },
+                        onClick = {
+                            linkExpanded = false
+                            try {
+                                context.startActivity(intent)
+                            } catch (_: ActivityNotFoundException) {
+                                Toast.makeText(context, "Nije pronađena aplikacija koja može otvoriti link.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Kopiraj link") },
+                        onClick = {
+                            linkExpanded = false
+                            context.getSystemService(ClipboardManager::class.java).setPrimaryClip(
+                                ClipData.newPlainText("Link", intent.data.toString()),
+                            )
+                            Toast.makeText(context, "Link je kopiran.", Toast.LENGTH_SHORT).show()
+                        },
+                    )
+                }
+            }
+        }
+        ItemActionButton(
+            icon = R.drawable.ic_delete,
+            description = "Obriši stavku",
+            onClick = onDelete,
+            tint = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+@Composable
+private fun ItemActionButton(
+    icon: Int,
+    description: String,
+    onClick: () -> Unit,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+        Icon(painterResource(icon), description, modifier = Modifier.size(18.dp), tint = tint)
+    }
+}
+
+private fun showItemDatePicker(
+    context: android.content.Context,
+    item: Item,
+    onSchedule: (Long?) -> Unit,
+) {
+    val calendar = Calendar.getInstance().apply {
+        item.scheduledAt?.let { timeInMillis = it }
+    }
+    DatePickerDialog(
+        context,
+        { _, year, month, day ->
+            Calendar.getInstance().apply {
+                set(year, month, day, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+                onSchedule(timeInMillis)
+            }
+        },
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH),
+        calendar.get(Calendar.DAY_OF_MONTH),
+    ).show()
 }
 
 @Composable
@@ -1766,25 +1936,7 @@ private fun ItemActionsSheet(
     val context = LocalContext.current
     var moveMenuExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
     val linkIntent = createWebLinkIntent(item.text)
-    val showDatePicker = {
-        val calendar = Calendar.getInstance().apply {
-            item.scheduledAt?.let { timeInMillis = it }
-        }
-        onDismiss()
-        DatePickerDialog(
-            context,
-            { _, year, month, day ->
-                Calendar.getInstance().apply {
-                    set(year, month, day, 0, 0, 0)
-                    set(Calendar.MILLISECOND, 0)
-                    onSchedule(timeInMillis)
-                }
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH),
-        ).show()
-    }
+    val showDatePicker = { onDismiss(); showItemDatePicker(context, item, onSchedule) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
