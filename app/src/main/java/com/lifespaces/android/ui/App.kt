@@ -1448,31 +1448,57 @@ private fun TimeOverviewSection(
     onItemSelected: (Item) -> Unit,
 ) {
     val spacesById = spaces.associateBy(Space::id)
+    var expanded by rememberSaveable { mutableStateOf(true) }
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "reminder expansion",
+    )
     Card(
         shape = LifeSpacesCardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            OverviewItems(
-                title = "Danas · ${SimpleDateFormat("d. MMM yyyy.", Locale.getDefault()).format(Date())}",
-                items = todayItems,
-                spacesById = spacesById,
-                emptyMessage = "Nema stavki za danas.",
-                onItemSelected = onItemSelected,
-            )
-            HorizontalDivider()
-            OverviewItems(
-                title = "Predstojeće",
-                items = upcomingItems,
-                spacesById = spacesById,
-                emptyMessage = "Nema predstojećih stavki.",
-                showItemDates = true,
-                onItemSelected = onItemSelected,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(
+                    onClickLabel = if (expanded) "Sakrij podsjetnik" else "Prikaži podsjetnik",
+                    role = Role.Button,
+                ) { expanded = !expanded }.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Podsjetnik", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                Icon(
+                    painter = painterResource(R.drawable.ic_expand_more),
+                    contentDescription = null,
+                    modifier = Modifier.graphicsLayer { rotationZ = rotation },
+                )
+            }
+            if (expanded) {
+                HorizontalDivider()
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    OverviewItems(
+                        title = "Danas · ${SimpleDateFormat("d. MMM yyyy.", Locale.getDefault()).format(Date())}",
+                        items = todayItems,
+                        spacesById = spacesById,
+                        emptyMessage = "Nema stavki za danas.",
+                        onItemSelected = onItemSelected,
+                    )
+                    HorizontalDivider()
+                    OverviewItems(
+                        title = "Predstojeće",
+                        items = upcomingItems,
+                        spacesById = spacesById,
+                        emptyMessage = "Nema predstojećih stavki.",
+                        showItemDates = true,
+                        onItemSelected = onItemSelected,
+                    )
+                }
+            }
         }
     }
 }
