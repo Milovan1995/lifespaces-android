@@ -144,6 +144,8 @@ fun App(viewModel: AppViewModel) {
     var editingSpaceColor by rememberSaveable { mutableStateOf<Long?>(null) }
     var confirmingSpaceEditId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showSystemAlarmDialog by rememberSaveable { mutableStateOf(false) }
+    var showingSearch by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var showingCalendar by rememberSaveable { mutableStateOf(false) }
     var weekStartEpochDay by rememberSaveable { mutableStateOf(mondayOf(LocalDate.now()).toEpochDay()) }
     var selectedDateEpochDay by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -173,6 +175,10 @@ fun App(viewModel: AppViewModel) {
     BackHandler(enabled = showingCalendar) {
         if (selectedDateEpochDay != null) selectedDateEpochDay = null else showingCalendar = false
     }
+    BackHandler(enabled = showingSearch) {
+        showingSearch = false
+        searchQuery = ""
+    }
     LifeSpacesTheme(darkTheme = darkTheme) {
         val defaultSpaceAccent = MaterialTheme.colorScheme.primary
         val inboxAccent = MaterialTheme.colorScheme.secondary
@@ -182,12 +188,18 @@ fun App(viewModel: AppViewModel) {
                 TopAppBar(
                     title = {
                         Text(
-                            if (showingCalendar) "Moj kalendar" else "LifeSpaces",
+                            when {
+                                showingSearch -> "Pretraga"
+                                showingCalendar -> "Moj kalendar"
+                                else -> "LifeSpaces"
+                            },
                             modifier = Modifier.clickable(
                                 onClickLabel = "Vrati na početni ekran",
                                 role = Role.Button,
                             ) {
                                 showingCalendar = false
+                                showingSearch = false
+                                searchQuery = ""
                                 selectedDateEpochDay = null
                                 expandedItemId = null
                                 editingItemId = null
@@ -203,6 +215,24 @@ fun App(viewModel: AppViewModel) {
                         )
                     },
                     actions = {
+                        IconButton(onClick = {
+                            if (showingSearch) {
+                                showingSearch = false
+                                searchQuery = ""
+                            } else {
+                                showingSearch = true
+                                showingCalendar = false
+                                selectedDateEpochDay = null
+                                expandedItemId = null
+                                editingItemId = null
+                                editingItemLabel = null
+                            }
+                        }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_search),
+                                contentDescription = if (showingSearch) "Zatvori pretragu" else "Otvori pretragu",
+                            )
+                        }
                         IconButton(onClick = { showSystemAlarmDialog = true }) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_alarm),
@@ -210,6 +240,8 @@ fun App(viewModel: AppViewModel) {
                             )
                         }
                         IconButton(onClick = {
+                            showingSearch = false
+                            searchQuery = ""
                             showingCalendar = !showingCalendar
                             selectedDateEpochDay = null
                             if (showingCalendar) {
@@ -267,6 +299,26 @@ fun App(viewModel: AppViewModel) {
                     onItemSelected = { expandedItemId = it.id },
                     onSaveShiftDay = viewModel::saveShiftDay,
                     onClearShiftDay = viewModel::clearShiftDay,
+                )
+            } else if (showingSearch) {
+                SearchScreen(
+                    modifier = Modifier.padding(innerPadding),
+                    query = searchQuery,
+                    results = searchItems(state.items, state.spaces, searchQuery),
+                    spaces = state.spaces,
+                    onQueryChange = { searchQuery = it },
+                    onItemSelected = { item ->
+                        showingSearch = false
+                        searchQuery = ""
+                        expandedItemId = null
+                        editingItemId = null
+                        editingItemLabel = null
+                        addingItemSpaceId = null
+                        val (targetSpaceId, targetIndex) = searchResultTarget(item, state.spaces)
+                        inboxExpanded = targetSpaceId == null
+                        expandedSpaceId = targetSpaceId
+                        coroutineScope.launch { homeListState.scrollToItem(targetIndex) }
+                    },
                 )
             } else {
             LazyColumn(
@@ -1029,6 +1081,76 @@ private fun SpaceChild(accent: Color, content: @Composable () -> Unit) {
         )
         Box(Modifier.weight(1f).padding(start = 10.dp)) { content() }
     }
+}
+
+@Composable
+private fun SearchScreen(
+    modifier: Modifier,
+    query: String,
+    results: List<Item>,
+    spaces: List<Space>,
+    onQueryChange: (String) -> Unit,
+    onItemSelected: (Item) -> Unit,
+) {
+    val spacesById = spaces.associateBy(Space::id)
+    LazyColumn(
+        modifier = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Pretraži stavke i prostore") },
+                singleLine = true,
+            )
+        }
+        when {
+            query.isBlank() -> item {
+                Text("Unesi tekst za pretragu.", style = MaterialTheme.typography.bodyMedium)
+            }
+            results.isEmpty() -> item {
+                Text("Nema odgovarajućih stavki.", style = MaterialTheme.typography.bodyMedium)
+            }
+            else -> items(results, key = Item::id) { item ->
+                val space = item.spaceId?.let(spacesById::get)
+                Card(
+                    onClick = { onItemSelected(item) },
+                    shape = LifeSpacesCardShape,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(item.text, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            space?.name ?: "Nesortirano",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+internal fun searchItems(items: List<Item>, spaces: List<Space>, query: String): List<Item> {
+    val needle = query.trim()
+    if (needle.isEmpty()) return emptyList()
+    val spacesById = spaces.associateBy(Space::id)
+    return items.filter { item ->
+        item.text.contains(needle, ignoreCase = true) ||
+            item.spaceId?.let { spacesById[it]?.name?.contains(needle, ignoreCase = true) } == true
+    }
+}
+
+internal fun searchResultTarget(item: Item, spaces: List<Space>): Pair<Long?, Int> {
+    val spaceIndex = spaces.indexOfFirst { it.id == item.spaceId }
+    return if (spaceIndex >= 0) item.spaceId to 5 + spaceIndex else null to 2
 }
 
 @Composable
