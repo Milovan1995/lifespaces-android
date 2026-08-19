@@ -842,10 +842,10 @@ fun App(viewModel: AppViewModel) {
                                     isEditing = editingItemId == item.id,
                                     editingLabel = if (editingItemId == item.id) editingItemLabel else null,
                                     editingText = if (editingItemId == item.id) editingText else item.text,
-                                    onToggleExpanded = if (hasCompletion) {
-                                        { viewModel.setItemCompleted(item.id, item.completed != true) }
-                                    } else {
-                                        null
+                                    onToggleExpanded = when {
+                                        hasCompletion -> { { viewModel.setItemCompleted(item.id, item.completed != true) } }
+                                        hasLinks && createWebLinkIntent(item.text) != null -> { { expandedItemId = item.id } }
+                                        else -> null
                                     },
                                     onLabelChange = { editingItemLabel = it },
                                     onTextChange = { editingText = it },
