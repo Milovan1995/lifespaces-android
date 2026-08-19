@@ -1,6 +1,7 @@
 package com.lifespaces.android.ui
 
 import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.app.Activity
 import android.Manifest
 import android.content.ActivityNotFoundException
@@ -139,6 +140,7 @@ fun App(viewModel: AppViewModel) {
     var expandedSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
     var inboxExpanded by rememberSaveable { mutableStateOf(false) }
     var expandedItemId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var systemAlarmItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var spaceMenuId by rememberSaveable { mutableStateOf<Long?>(null) }
     var addingItemSpaceId by rememberSaveable { mutableStateOf<Long?>(null) }
     var newSpaceItemLabel by rememberSaveable { mutableStateOf("") }
@@ -869,7 +871,11 @@ fun App(viewModel: AppViewModel) {
                                             },
                                             onMove = { destination -> viewModel.moveItem(item.id, destination) },
                                             onDelete = { deletingItemId = item.id },
-                                            onSchedule = { viewModel.setItemScheduledAt(item.id, it) },
+                                            onSchedule = { scheduledAt, hasTime -> viewModel.setItemScheduledAt(item.id, scheduledAt, hasTime) },
+                                            onSetAlarm = {
+                                                systemAlarmItemId = item.id
+                                                showSystemAlarmDialog = true
+                                            },
                                         )
                                     },
                                     )
@@ -1084,8 +1090,8 @@ fun App(viewModel: AppViewModel) {
                     viewModel.moveItem(selectedItem.id, destination)
                     expandedItemId = null
                 },
-                onSchedule = { scheduledAt ->
-                    viewModel.setItemScheduledAt(selectedItem.id, scheduledAt)
+                onSchedule = { scheduledAt, hasTime ->
+                    viewModel.setItemScheduledAt(selectedItem.id, scheduledAt, hasTime)
                     expandedItemId = null
                 },
                 onDelete = {
@@ -1095,6 +1101,7 @@ fun App(viewModel: AppViewModel) {
             )
         }
         if (showSystemAlarmDialog) {
+            val alarmItem = state.items.firstOrNull { it.id == systemAlarmItemId }
             val tomorrow = LocalDate.now().plusDays(1)
             val suggestion = shiftAlarmSuggestion(
                 tomorrow,
@@ -1103,14 +1110,18 @@ fun App(viewModel: AppViewModel) {
                 calendar.shiftDays,
             )?.takeIf { isSystemAlarmTimeAllowed(it.date, it.minute) }
             SystemAlarmDialog(
-                label = suggestion?.let { "${it.shiftName} smjena" } ?: "Alarm",
-                preferredDate = suggestion?.date,
-                preferredMinute = suggestion?.minute,
-                onDismiss = { showSystemAlarmDialog = false },
+                label = alarmItem?.text ?: suggestion?.let { "${it.shiftName} smjena" } ?: "Alarm",
+                preferredDate = alarmItem?.scheduledAt?.let { Date(it).toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate() } ?: suggestion?.date,
+                preferredMinute = alarmItem?.scheduledAt?.let { time ->
+                    if (alarmItem.hasScheduledTime) Calendar.getInstance().apply { timeInMillis = time }.let { it.get(Calendar.HOUR_OF_DAY) * 60 + it.get(Calendar.MINUTE) } else 0
+                } ?: suggestion?.minute,
+                usePreferredTimeEvenWhenInvalid = alarmItem != null,
+                onDismiss = { showSystemAlarmDialog = false; systemAlarmItemId = null },
                 onSaveAlarm = { intent ->
                     try {
                         context.startActivity(intent)
                         showSystemAlarmDialog = false
+                        systemAlarmItemId = null
                     } catch (_: ActivityNotFoundException) {
                         Toast.makeText(context, "Nije pronađena aplikacija za alarm.", Toast.LENGTH_SHORT).show()
                     }
@@ -1768,13 +1779,19 @@ private fun ItemCard(
                 itemActions()
                 item.scheduledAt?.takeIf { showDateActions }?.let {
                     Text(
-                        "Datum: ${SimpleDateFormat("d. MMM yyyy.", Locale.getDefault()).format(Date(it))}",
+                        formatItemSchedule(item),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
         }
     }
+}
+
+private fun formatItemSchedule(item: Item): String {
+    val scheduledAt = requireNotNull(item.scheduledAt)
+    val pattern = if (item.hasScheduledTime) "d. MMM yyyy. HH:mm" else "d. MMM yyyy."
+    return "Datum: ${SimpleDateFormat(pattern, Locale.getDefault()).format(Date(scheduledAt))}"
 }
 
 @Composable
@@ -1785,7 +1802,8 @@ private fun ItemQuickActions(
     onEdit: () -> Unit,
     onMove: (Long?) -> Unit,
     onDelete: () -> Unit,
-    onSchedule: (Long?) -> Unit,
+    onSchedule: (Long?, Boolean) -> Unit,
+    onSetAlarm: () -> Unit,
 ) {
     val context = LocalContext.current
     var moveExpanded by remember { mutableStateOf(false) }
@@ -1794,11 +1812,15 @@ private fun ItemQuickActions(
     val linkIntent = createWebLinkIntent(item.text)
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ItemActionButton(R.drawable.ic_edit, "Uredi stavku", onEdit)
-        Box {
+        if (item.scheduledAt != null) {
+            ItemActionButton(R.drawable.ic_alarm, "Podesi alarm", onSetAlarm)
+        }
+        Row {
+            ItemActionButton(R.drawable.ic_edit, "Uredi stavku", onEdit)
+            Box {
             ItemActionButton(R.drawable.ic_move, "Premjesti stavku", onClick = { moveExpanded = true })
             DropdownMenu(expanded = moveExpanded, onDismissRequest = { moveExpanded = false }) {
                 DropdownMenuItem(
@@ -1812,9 +1834,9 @@ private fun ItemQuickActions(
                     )
                 }
             }
-        }
-        if (showDateActions) {
-            Box {
+            }
+            if (showDateActions) {
+                Box {
                 ItemActionButton(R.drawable.ic_calendar, "Akcije datuma", onClick = { calendarExpanded = true })
                 DropdownMenu(expanded = calendarExpanded, onDismissRequest = { calendarExpanded = false }) {
                         DropdownMenuItem(
@@ -1826,8 +1848,21 @@ private fun ItemQuickActions(
                         )
                         if (item.scheduledAt != null) {
                             DropdownMenuItem(
+                                text = { Text(if (item.hasScheduledTime) "Promijeni vrijeme" else "Podesi vrijeme") },
+                                onClick = {
+                                    calendarExpanded = false
+                                    showItemTimePicker(context, item, onSchedule)
+                                },
+                            )
+                            if (item.hasScheduledTime) {
+                                DropdownMenuItem(
+                                    text = { Text("Ukloni vrijeme") },
+                                    onClick = { calendarExpanded = false; onSchedule(item.scheduledAt, false) },
+                                )
+                            }
+                            DropdownMenuItem(
                                 text = { Text("Ukloni datum") },
-                                onClick = { calendarExpanded = false; onSchedule(null) },
+                                onClick = { calendarExpanded = false; onSchedule(null, false) },
                             )
                             DropdownMenuItem(
                                 text = { Text("Dodaj u kalendar") },
@@ -1844,9 +1879,9 @@ private fun ItemQuickActions(
                         }
                 }
             }
-        }
-        linkIntent?.let { intent ->
-            Box {
+            }
+            linkIntent?.let { intent ->
+                Box {
                 ItemActionButton(R.drawable.ic_more_vert, "Akcije linka", onClick = { linkExpanded = true })
                 DropdownMenu(expanded = linkExpanded, onDismissRequest = { linkExpanded = false }) {
                     DropdownMenuItem(
@@ -1871,14 +1906,15 @@ private fun ItemQuickActions(
                         },
                     )
                 }
+                }
             }
+            ItemActionButton(
+                icon = R.drawable.ic_delete,
+                description = "Obriši stavku",
+                onClick = onDelete,
+                tint = MaterialTheme.colorScheme.error,
+            )
         }
-        ItemActionButton(
-            icon = R.drawable.ic_delete,
-            description = "Obriši stavku",
-            onClick = onDelete,
-            tint = MaterialTheme.colorScheme.error,
-        )
     }
 }
 
@@ -1897,7 +1933,7 @@ private fun ItemActionButton(
 private fun showItemDatePicker(
     context: android.content.Context,
     item: Item,
-    onSchedule: (Long?) -> Unit,
+    onSchedule: (Long?, Boolean) -> Unit,
 ) {
     val calendar = Calendar.getInstance().apply {
         item.scheduledAt?.let { timeInMillis = it }
@@ -1906,14 +1942,35 @@ private fun showItemDatePicker(
         context,
         { _, year, month, day ->
             Calendar.getInstance().apply {
-                set(year, month, day, 0, 0, 0)
+                set(year, month, day, if (item.hasScheduledTime) calendar.get(Calendar.HOUR_OF_DAY) else 0, if (item.hasScheduledTime) calendar.get(Calendar.MINUTE) else 0, 0)
                 set(Calendar.MILLISECOND, 0)
-                onSchedule(timeInMillis)
+                onSchedule(timeInMillis, item.hasScheduledTime)
             }
         },
         calendar.get(Calendar.YEAR),
         calendar.get(Calendar.MONTH),
         calendar.get(Calendar.DAY_OF_MONTH),
+    ).show()
+}
+
+private fun showItemTimePicker(
+    context: android.content.Context,
+    item: Item,
+    onSchedule: (Long?, Boolean) -> Unit,
+) {
+    val calendar = Calendar.getInstance().apply { item.scheduledAt?.let { timeInMillis = it } }
+    TimePickerDialog(
+        context,
+        { _, hour, minute ->
+            calendar.set(Calendar.HOUR_OF_DAY, hour)
+            calendar.set(Calendar.MINUTE, minute)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            onSchedule(calendar.timeInMillis, true)
+        },
+        if (item.hasScheduledTime) calendar.get(Calendar.HOUR_OF_DAY) else 0,
+        if (item.hasScheduledTime) calendar.get(Calendar.MINUTE) else 0,
+        true,
     ).show()
 }
 
@@ -1926,7 +1983,7 @@ private fun ItemActionsSheet(
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onMove: (Long?) -> Unit,
-    onSchedule: (Long?) -> Unit,
+    onSchedule: (Long?, Boolean) -> Unit,
     onDelete: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -1941,7 +1998,7 @@ private fun ItemActionsSheet(
             Text(item.text, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.titleLarge)
             item.scheduledAt?.let {
                 Text(
-                    SimpleDateFormat("d. MMM yyyy.", Locale.getDefault()).format(Date(it)),
+                    formatItemSchedule(item),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1997,7 +2054,14 @@ private fun ItemActionsSheet(
                     showDatePicker()
                 }
                 if (item.scheduledAt != null) {
-                    SheetAction("Ukloni datum") { onSchedule(null) }
+                    SheetAction(if (item.hasScheduledTime) "Promijeni vrijeme" else "Podesi vrijeme") {
+                        onDismiss()
+                        showItemTimePicker(context, item, onSchedule)
+                    }
+                    if (item.hasScheduledTime) {
+                        SheetAction("Ukloni vrijeme") { onSchedule(item.scheduledAt, false) }
+                    }
+                    SheetAction("Ukloni datum") { onSchedule(null, false) }
                     SheetAction("Dodaj u kalendar") {
                         onDismiss()
                         val location = spaces.firstOrNull { it.id == item.spaceId }?.location
@@ -2033,7 +2097,7 @@ internal fun createCalendarInsertIntent(item: Item, location: String?): Intent {
     val start = requireNotNull(item.scheduledAt) { "Stavka mora imati datum." }
     val end = Calendar.getInstance().apply {
         timeInMillis = start
-        add(Calendar.DAY_OF_MONTH, 1)
+        add(if (item.hasScheduledTime) Calendar.HOUR_OF_DAY else Calendar.DAY_OF_MONTH, if (item.hasScheduledTime) 1 else 1)
     }.timeInMillis
 
     return Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).apply {
@@ -2041,7 +2105,7 @@ internal fun createCalendarInsertIntent(item: Item, location: String?): Intent {
         putExtra(CalendarContract.Events.EVENT_LOCATION, location)
         putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, start)
         putExtra(CalendarContract.EXTRA_EVENT_END_TIME, end)
-        putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, true)
+        putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, !item.hasScheduledTime)
     }
 }
 

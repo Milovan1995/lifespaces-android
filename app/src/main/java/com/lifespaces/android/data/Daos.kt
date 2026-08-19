@@ -44,7 +44,7 @@ interface SpaceDao {
     @Query("UPDATE items SET completed = NULL, updatedAt = :updatedAt WHERE spaceId = :spaceId")
     suspend fun clearCompleted(spaceId: Long, updatedAt: Long)
 
-    @Query("UPDATE items SET scheduledAt = NULL, updatedAt = :updatedAt WHERE spaceId = :spaceId")
+    @Query("UPDATE items SET scheduledAt = NULL, hasScheduledTime = 0, updatedAt = :updatedAt WHERE spaceId = :spaceId")
     suspend fun clearScheduledAt(spaceId: Long, updatedAt: Long)
 
     @Query("UPDATE items SET spaceId = NULL, updatedAt = :updatedAt WHERE spaceId = :spaceId")
@@ -109,8 +109,8 @@ interface ItemDao {
     @Query("UPDATE items SET completed = :completed, updatedAt = :updatedAt WHERE id = :itemId")
     suspend fun updateCompleted(itemId: Long, completed: Boolean, updatedAt: Long)
 
-    @Query("UPDATE items SET scheduledAt = :scheduledAt, updatedAt = :updatedAt WHERE id = :itemId")
-    suspend fun updateScheduledAt(itemId: Long, scheduledAt: Long?, updatedAt: Long)
+    @Query("UPDATE items SET scheduledAt = :scheduledAt, hasScheduledTime = :hasScheduledTime, updatedAt = :updatedAt WHERE id = :itemId")
+    suspend fun updateScheduledAt(itemId: Long, scheduledAt: Long?, hasScheduledTime: Boolean, updatedAt: Long)
 
     @Query("SELECT * FROM items WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): Item?

@@ -20,6 +20,37 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class AppDatabaseMigrationTest {
     @Test
+    fun migration3To4_keepsExistingDatesAllDay() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase(TIMED_ITEMS_DATABASE_NAME)
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(TIMED_ITEMS_DATABASE_NAME)
+                .callback(object : SupportSQLiteOpenHelper.Callback(3) {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        db.execSQL("""CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, spaceId INTEGER, text TEXT NOT NULL, scheduledAt INTEGER, completed INTEGER, sortOrder INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)""")
+                    }
+                    override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+                })
+                .build(),
+        )
+        try {
+            helper.writableDatabase.apply {
+                execSQL("INSERT INTO items (id, spaceId, text, scheduledAt, completed, sortOrder, createdAt, updatedAt) VALUES (4, NULL, 'Existing date', 1700000000000, NULL, 0, 1, 1)")
+                MIGRATION_3_4.migrate(this)
+                query("SELECT scheduledAt, hasScheduledTime FROM items WHERE id = 4").use { cursor ->
+                    cursor.moveToFirst()
+                    assertEquals(1_700_000_000_000L, cursor.getLong(0))
+                    assertEquals(0, cursor.getInt(1))
+                }
+            }
+        } finally {
+            helper.close()
+            context.deleteDatabase(TIMED_ITEMS_DATABASE_NAME)
+        }
+    }
+
+    @Test
     fun migration2To3_addsVoiceNotesWithoutChangingItems() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.deleteDatabase(VOICE_NOTES_DATABASE_NAME)
@@ -85,7 +116,7 @@ class AppDatabaseMigrationTest {
             }
 
             val room = Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .allowMainThreadQueries()
                 .build()
             try {
@@ -103,16 +134,17 @@ class AppDatabaseMigrationTest {
                         assertEquals(1000L, cursor.getLong(6))
                     }
                     migrated.query(
-                        "SELECT spaceId, text, scheduledAt, completed, sortOrder, createdAt, updatedAt FROM items WHERE id = 9",
+                        "SELECT spaceId, text, scheduledAt, hasScheduledTime, completed, sortOrder, createdAt, updatedAt FROM items WHERE id = 9",
                     ).use { cursor ->
                         cursor.moveToFirst()
                         assertEquals(7L, cursor.getLong(0))
                         assertEquals("Existing item", cursor.getString(1))
                         assertEquals(1_700_000_000_000L, cursor.getLong(2))
-                        assertEquals(1, cursor.getInt(3))
-                        assertEquals(4L, cursor.getLong(4))
-                        assertEquals(2000L, cursor.getLong(5))
-                        assertEquals(3000L, cursor.getLong(6))
+                        assertEquals(0, cursor.getInt(3))
+                        assertEquals(1, cursor.getInt(4))
+                        assertEquals(4L, cursor.getLong(5))
+                        assertEquals(2000L, cursor.getLong(6))
+                        assertEquals(3000L, cursor.getLong(7))
                     }
                     migrated.query("SELECT spaceId, capability FROM space_capabilities WHERE id = 8").use { cursor ->
                         cursor.moveToFirst()
@@ -184,5 +216,6 @@ class AppDatabaseMigrationTest {
     private companion object {
         const val DATABASE_NAME = "migration-1-2"
         const val VOICE_NOTES_DATABASE_NAME = "migration-2-3"
+        const val TIMED_ITEMS_DATABASE_NAME = "migration-3-4"
     }
 }

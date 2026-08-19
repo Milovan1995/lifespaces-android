@@ -29,6 +29,7 @@ data class Item(
     val spaceId: Long? = null,
     val text: String,
     val scheduledAt: Long? = null,
+    val hasScheduledTime: Boolean = false,
     val completed: Boolean? = null,
     val sortOrder: Long = 0,
     val createdAt: Long = System.currentTimeMillis(),

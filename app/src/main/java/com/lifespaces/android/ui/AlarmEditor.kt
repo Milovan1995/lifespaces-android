@@ -79,13 +79,18 @@ internal fun SystemAlarmDialog(
     label: String,
     preferredDate: LocalDate?,
     preferredMinute: Int?,
+    usePreferredTimeEvenWhenInvalid: Boolean = false,
     onDismiss: () -> Unit,
     onSaveAlarm: (Intent) -> Unit,
 ) {
     val context = LocalContext.current
     val now = remember { ZonedDateTime.now() }
-    val default = remember(label, preferredDate, preferredMinute) {
-        defaultSystemAlarmTime(preferredDate, preferredMinute, now)
+    val default = remember(label, preferredDate, preferredMinute, usePreferredTimeEvenWhenInvalid) {
+        if (usePreferredTimeEvenWhenInvalid && preferredDate != null && preferredMinute != null) {
+            preferredDate to preferredMinute
+        } else {
+            defaultSystemAlarmTime(preferredDate, preferredMinute, now)
+        }
     }
     var date by rememberSaveable(label) { mutableStateOf(default.first.toString()) }
     var minute by rememberSaveable(label) { mutableStateOf(default.second) }

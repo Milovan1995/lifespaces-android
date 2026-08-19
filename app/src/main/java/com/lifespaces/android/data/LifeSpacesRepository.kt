@@ -141,8 +141,8 @@ class LifeSpacesRepository(
         itemDao.updateCompleted(itemId, completed, System.currentTimeMillis())
     }
 
-    suspend fun setItemScheduledAt(itemId: Long, scheduledAt: Long?) {
-        itemDao.updateScheduledAt(itemId, scheduledAt, System.currentTimeMillis())
+    suspend fun setItemScheduledAt(itemId: Long, scheduledAt: Long?, hasScheduledTime: Boolean = false) {
+        itemDao.updateScheduledAt(itemId, scheduledAt, scheduledAt != null && hasScheduledTime, System.currentTimeMillis())
     }
 
     suspend fun deleteItem(itemId: Long) {
